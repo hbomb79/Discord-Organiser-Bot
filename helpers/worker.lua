@@ -1,3 +1,4 @@
+print "HIT"
 -- Define constants here to allow quick access in future.
 HOST_ROLE, HOST_CHANNEL, BOT_SNOWFLAKE = "", "361062102732898314", "361038817840332800"
 commands, reporter, restrict, events, jpersist, log = require "helpers.commands", require "helpers.reporter", require "helpers.restrict", require "helpers.events", require "helpers.jpersist", require "helpers.logger"
@@ -7,7 +8,7 @@ return {
 	queue = {},
 	userRequests = {},
 
-	init = function( self, client, j )
+	init = function( self, client, j, d )
 		log.i "Fetching GUILD information"
 		CLIENT = client
 
@@ -24,6 +25,11 @@ return {
 
 		log.i( "Imported JSON library to global space " .. tostring( json ) )
 
+		log:assert( d, "Failed to import Discordia library" )
+		discordia = d
+
+		log.i( "Imported Discordia library to global space " .. tostring( discordia ) )
+
 		-- Check that all workers have what they need
 		for k, v in pairs { commands = commands, reporter = reporter, restrict = restrict, events = events, jpersist = jpersist } do
 			if not log:assert( v:check(), "Required '"..k.."' library (helpers/"..k..".lua) unable to start. Bot cannot start without all requirements fully functional -- aborting" ) then return end
@@ -32,6 +38,7 @@ return {
 
 		events:loadEvents()
 		restrict.bannedUsers = jpersist.loadTable( "./banned.cfg" ) or {}
+		events:refreshRemote()
 
 		log.i "Done - All OK"
 		return true
@@ -61,7 +68,7 @@ return {
 			log.w("Author " .. tostring( author ) .. " has " .. uR .. " requests in the queue. Restricting user")
 			restrict:restrictUser( author.id )
 
-			reporter:send( author, "User Restricted", "Your account has been restricted due to heavy inbound traffic. This restriction will automatically be lifted in a few seconds.\n\nFurther abuse will lead to permanent blacklisting.")
+			reporter:warning( author, "User Restricted", "Your account has been restricted due to heavy inbound traffic. This restriction will automatically be lifted in a few seconds.\n\nFurther abuse will lead to permanent blacklisting.")
 			return
 		end
 
@@ -84,13 +91,13 @@ return {
 				if not restrict:checkMutualGuilds( author ) then
 					-- This is a message from a user OUTSIDE of the guild. Notify and ignore.
 					log.i "Message received was created by a foreign user -- notifying user"
-					reporter:send( author, "Unknown User", "Your user is not recognised. Ensure you are a member of the BGnS guild and try again.\n\nIf you believe this is in error contact the guild owner" )
+					reporter:warning( author, "Unknown User", "Your user is not recognised. Ensure you are a member of the BGnS guild and try again.\n\nIf you believe this is in error contact the guild owner" )
 				else
 					local validCommand = commands:checkCommand( content )
 					if not validCommand then
 						-- Invalid syntax
 						log.i "Message received was malformed -- notifying user."
-						reporter:send( author, "Command Malformed", "The command sent to this bot was not recognised. Ensure format is '!command' and check for typing mistakes" )
+						reporter:warning( author, "Command Malformed", "The command sent to this bot was not recognised. Ensure format is '!command' and check for typing mistakes" )
 					else
 						log.i "Message received is a valid command, executing command"
 						commands:runCommand( content, validCommand )

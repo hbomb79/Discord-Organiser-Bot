@@ -20,7 +20,7 @@ end )
 
 CLIENT:once( "ready", function()
 	log.i "Client started, initialising worker"
-	worker:init( CLIENT, json )
+	worker:init( CLIENT, json, discordia )
 end )
 
 -- Run the client

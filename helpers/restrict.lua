@@ -31,7 +31,7 @@ return {
 		log.i("User has violated restriction " .. restriction.violations .. " times.")
 		if restriction.violations > 10 then
 			log.w("User has been banned due to excessive restriction violation")
-			if not self.bannedUsers[ userID ] then reporter:send( user, "Account Banned", "Your account has been permanently suspended. This bot will no longer respond to messages originating from this account.\n\nIf you believe this is in error please contact the guild owner/server administrators." ) end
+			if not self.bannedUsers[ userID ] then reporter:failure( user, "Account Banned", "Your account has been permanently suspended. This bot will no longer respond to messages originating from this account.\n\nIf you believe this is in error please contact the guild owner/server administrators." ) end
 			self.bannedUsers[ userID ] = true
 
 			log.i("Saving banned users:")

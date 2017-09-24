@@ -23,15 +23,15 @@ local VALID_COMMANDS = {
 					local com = args[ i ]
 					if COMMAND_HELP[ com ] then
 						log.i("Serving help for cmd " .. com)
-						reporter:send( message.author, "Help ["..com.."]", COMMAND_HELP[ com ] )
+						reporter:info( message.author, "Help ["..com.."]", COMMAND_HELP[ com ] )
 					else
 						log.w("Help information not available for "..com)
-						reporter:send( message.author, "Help ["..com.."]", "Unknown command '"..com.."'" )
+						reporter:failure( message.author, "Help ["..com.."]", "Unknown command '"..com.."'" )
 					end
 				end
 			else
 				for name, desc in pairs( COMMAND_HELP ) do
-					reporter:send( message.author, "Help ["..name.."]", desc )
+					reporter:info( message.author, "Help ["..name.."]", desc )
 				end
 			end
 		else
@@ -50,7 +50,7 @@ local VALID_COMMANDS = {
 		end
 	end,
 
-	create = function( commands, message, ... )
+	create = function( commands, message )
 		local user = message.author
 		log.i("Attempting to create a new event for user " .. tostring( user ))
 
@@ -58,68 +58,106 @@ local VALID_COMMANDS = {
 		if ev then
 			log.i("User already has a registered event -- notifying user")
 			-- There is already an event for this user, tell them to remove it first
-			reporter:send( user, "Event already exists", "You already own an event. " .. ( ev.published and "Use **!delete** to unpublish and remove your event" or "Use **!cancel** to allow a new event to be made" ) )
+			reporter:warning( user, "Event already exists", "You already own an event. " .. ( ev.published and "Use **!delete** to unpublish and remove your event" or "Use **!cancel** to allow a new event to be made" ) )
 			return
 		end
 
 		if events:createEvent( user ) then
 			log.i("Created new event -- notifying user")
-			reporter:send( user, "Created event", "Your event has been successfully created.")
+			reporter:success( user, "Created event", "Your event has been successfully created.\n\nCustomize it using any of: !setTitle, !setLocation, !setTimeframe, !setDesc (for each 'set' command their is a 'get' version too)!\n\n*Happy hosting!*")
 		else
 			log.w("Failed to create new event -- notifying user")
-			reporter:send( user, "Failed to create new event", "Please try again later." )
+			reporter:failure( user, "Failed to create new event", "Please try again later." )
 		end
 	end,
 
-	cancel = function( commands, message, ... )
+	cancel = function( commands, message )
 		local user = message.author
 		local event = events:getEvent( user )
 
 		log.i( "Attempting to cancel event creation for user "..tostring( user ) )
 		if not event then
 			log.w( "Failed to cancel event -- the user owns no events. Notifying user." )
-			reporter:send( user, "Failed to cancel event", "You don't own any unpublished events." )
+			reporter:warning( user, "Failed to cancel event", "You don't own any unpublished events." )
 		elseif event.published then
 			log.w( "Failed to cancel event -- the user has already published their event. Notifying user." )
-			reporter:send( user, "Failed to cancel event", "You're event has already been published. Use **!delete** to unpublish AND remove your event", { name = "WARNING", value = "Deleting an event will remove all RSVPs to the event without warning. This action is irreversible" } )
+			reporter:failure( user, "Failed to cancel event", "You're event has already been published. Use **!delete** to unpublish AND remove your event", { name = "WARNING", value = "Deleting an event will remove all RSVPs to the event without warning. This action is irreversible" } )
 		else
 			if events:cancelEvent( user ) then
 				log.i( "Event cancelled" )
-				reporter:send( user, "Event cancelled", "Your event has been successfully cancelled. No further action is required" )
+				reporter:success( user, "Event cancelled", "Your event has been successfully cancelled. No further action is required" )
 			else
 				log.w( "Unknown error occurred while cancelling event" )
-				reporter:send( user, "Failed to cancel event", "An unknown exception has occurred while trying to cancel your event. Notify <@157827690668359681> of this issue" )
+				reporter:failure( user, "Failed to cancel event", "An unknown exception has occurred while trying to cancel your event. Notify <@157827690668359681> of this issue" )
 			end
 		end
 	end,
 
-	delete = function( commands, message, ... )
+	delete = function( commands, message )
 		local user = message.author
 		local e = events:getEvent( user )
 
 		log.i( "Attempting to delete published event for user " .. tostring( user ) )
 		if not e or not e.published then
 			log.w( "Failed to delete event data -- the user owns no published events" )
-			reporter:send( user, "Failed to delete event", "You don't own any published events. Perhaps you meant to use **!cancel**?" )
+			reporter:warning( user, "Failed to delete event", "You don't own any published events. Perhaps you meant to use **!cancel**?" )
 		else
 			if events:unpublish( user ) then
 				if events:cancelEvent( user ) then
 					log.i( "Successfully deleted (unpublished and discarded) event" )
-					reporter:send( user, "Event deleted", "Your event has been successfully deleted. No further action is required", { name = "Attendees", value = "It is important to note that all RSVP information has been lost. All users who responded to this event have been notified of the event's removal" })
+					reporter:success( user, "Event deleted", "Your event has been successfully deleted. No further action is required", { name = "Attendees", value = "It is important to note that all RSVP information has been lost. All users who responded to this event have been notified of the event's removal" })
 				else
 					log.w( "Unpublished event but failed to cancel")
-					reporter:send( user, "Failed to fully removed event", "You're event has been successfully unpublished, however it could not be fully removed. Try running **!cancel** later." )
+					reporter:warning( user, "Failed to fully removed event", "You're event has been successfully unpublished, however it could not be fully removed. Try running **!cancel** later." )
 				end
 			else
 				log.w( "Failed to unpublish" )
-				reported:send( user, "Failed to unpublish event", "Please try again later, or contact <@157827690668359681> directly for removal" )
+				reporter:failure( user, "Failed to unpublish event", "Please try again later, or contact <@157827690668359681> directly for removal" )
 			end
+		end
+	end,
+
+	publish = function( commands, message )
+		local user = message.author
+		local event, current = events:getEvent( user ), events:getCurrentEvent()
+
+		if not event then
+			log.w "User has no events but is trying to publish. Notifying user."
+			reporter:warning( user, "Failed to publish", "You don't own any events. Create an event using **!create** before trying to publish" )
+		elseif current then
+			if event.author == user.id then
+				-- Already published
+				log.w "User has already published their event"
+				reporter:warning( user, "Already published", "Your event is already published -- you can see it in the BGnS planning chat. Un-publish with **!unpublish**, or delete completely with **!delete**.\n\nYou can still change details of your event, anyone that has RSVP'd will be notified (via direct messaging) of any changes you make.")
+			else
+				log.w "Another event has already been published"
+				reporter:warning( user, "Another Event Is Active", "An event has been published by someone else. You will not be able to publish your event until their event has concluded.\n\nIf you feel this is in error, contact the guild owner (<@157827690668359681>).")
+			end
+		else
+			if events:publishEvent( user ) then
+				reporter:success( user, "Published Event", "Your event has been published. View it now in the planning chat in BGnS, or use **!view** to view your event here.")
+			else
+				reporter:failure( user, "Failed to Publish Event", "Your event could not be published due to an unknown error. Please try again later, or contact <@157827690668359681> to report")
+			end
+		end
+	end,
+
+	unpublish = function( commands, message )
+		events:unpublishEvent( message.author )
+	end,
+
+	view = function( commands, message )
+		local user = message.author
+		if not events:getEvent( user ) then
+			reporter:warning( user, "Unable to View Event", "You don't own any events. Create one with **!create**" )
+		else
+			events:pushEvent( user.id, user )
 		end
 	end
 }
 
 -- Generate commands dynamically for the following properties. The function will simply change the property key-value of the users event.
-local VALID_FIELDS = { "title", "description", "timeframe", "location" }
+local VALID_FIELDS = { "title", "desc", "timeframe", "location" }
 for i = 1, #VALID_FIELDS do
 	local field = VALID_FIELDS[ i ]
 
@@ -131,11 +169,14 @@ for i = 1, #VALID_FIELDS do
 			-- This user owns no event
 			log.w("Cannot set field " .. field .." because the user ("..tostring( user )..") has no event")
 			local current = events:getCurrentEvent()
-			reporter:send( user, "Failed to set " .. field, "You don't own any events. Create one using **!create**", current and { name = "Change current event details", value = "As of this version (of the bot), only the event author can change details regarding the current event. Contact the host here: <@" .. current.author .. ">"} or nil )
+			reporter:warning( user, "Failed to set " .. field, "You don't own any events. Create one using **!create**", current and { name = "Change current event details", value = "As of this version (of the bot), only the event author can change details regarding the current event. Contact the host here: <@" .. current.author .. ">"} or nil )
 		else
-			if not events:updateEvent( user, field, ... ) then
+			if events:updateEvent( user, field, ... ) then
+				log.i("Updated event successfully")
+				reporter:success( user, "Successfully set field", "The " .. field .. " property for your event is now '"..tostring( ... ).."'.")
+			else
 				log.c("Failed to set field '"..field.."' for event owned by " .. tostring( user ))
-				reporter:send( user, "Failed to set " .. field, "Unknown error occurred. Please try again later, or contact <@157827690668359681> directly for assistance" )
+				reporter:failure( user, "Failed to set " .. field, "Unknown error occurred. Please try again later, or contact <@157827690668359681> directly for assistance" )
 			end
 		end
 	end
@@ -146,10 +187,10 @@ for i = 1, #VALID_FIELDS do
 		local e = events:getEvent( user )
 		if not e then
 			local current = events:getCurrentEvent()
-			reporter:send( user, "Failed to get " .. field, "You don't own any events. Create one using **!create**", current and { name = "Get current event details", value = "See the BGnS planning channel for information regarding the current event" } or nil )
+			reporter:warning( user, "Failed to get " .. field, "You don't own any events. Create one using **!create**", current and { name = "Get current event details", value = "See the BGnS planning channel for information regarding the current event" } or nil )
 		else
 			log.i("Returning information for field '"..tostring( field ).."'")
-			reporter:send( user, "Property - " .. name, "The " .. field .. " property for your event is '"..tostring( e[ field ] ).."'. Change with **!set" .. name .. "**" )
+			reporter:info( user, "Property - " .. name, "The " .. field .. " property for your event is '"..tostring( e[ field ] ).."'. Change with **!set" .. name .. "**" )
 		end
 	end
 end
@@ -171,7 +212,7 @@ return {
 		if VALID_COMMANDS[ parts[ 1 ] ] then
 			VALID_COMMANDS[ parts[ 1 ] ]( self, message, parts[ 2 ], unpack( splitArguments( parts[ 2 ] ) ) )
 		else
-			reporter:send( message.author, "Invalid command", "The command you sent was of valid syntax but references an unknown command. Did you make a typing mistake?" )
+			reporter:failure( message.author, "Invalid command", "The command you sent was of valid syntax but references an unknown command. Did you make a typing mistake?" )
 		end
 	end
 }
