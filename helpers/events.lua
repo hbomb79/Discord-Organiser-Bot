@@ -22,7 +22,12 @@ events.check = function() return true end
 	Basic event administration
 ]]
 events.getCurrentEvent = function( self )
-
+	local e = self.evs
+	for i = 1, #e do
+		if e[ i ].published then
+			return e[ i ], i
+		end
+	end
 end
 
 events.getEvent = function( self, user )
