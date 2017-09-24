@@ -22,7 +22,7 @@ return {
 	assert = function( self, v, m )
 		if not v then
 			self.f( m )
-			self.w "Client is attempting to gracefully stop after fatal exception"
+			self.c "Client is attempting to gracefully stop after fatal exception"
 
 			if CLIENT then CLIENT:stop() end
 			return false
