@@ -1,3 +1,10 @@
+local function splitArguments( val )
+    local parts = {}
+    for match in val:gmatch "(%S+)%s*" do parts[ #parts + 1 ] = match end
+
+    return parts
+end
+
 local COMMAND_HELP = {
 	help = "When called, the bot will reply with information regarding how to use it's basic commands (!create, !yes, !no, etc..)",
 	create = "Creates a new event for the user. If an event already exists (published or not) the command will refuse to complete",
@@ -7,16 +14,20 @@ local COMMAND_HELP = {
 }
 
 local VALID_COMMANDS = {
-	help = function( commands, message, arg )
-
-		log.i( "'"..arg.."'" )
-		if arg == "commands" then
-			local com = args[ 2 ]
-			if com then
-				if COMMAND_HELP[ com ] then
-					reporter:send( message.author, "Help ["..com.."]", COMMAND_HELP[ com ] )
-				else
-					reporter:send( message.author, "Help ["..com.."]", "Unknown command '"..com.."'" )
+	help = function( commands, message, _, ... )
+		local args = { ... }
+		if args[ 1 ] == "commands" then
+			if args[ 2 ] then
+				log.i("Serving help information for requested commands")
+				for i = 2, #args do
+					local com = args[ i ]
+					if COMMAND_HELP[ com ] then
+						log.i("Serving help for cmd " .. com)
+						reporter:send( message.author, "Help ["..com.."]", COMMAND_HELP[ com ] )
+					else
+						log.w("Help information not available for "..com)
+						reporter:send( message.author, "Help ["..com.."]", "Unknown command '"..com.."'" )
+					end
 				end
 			else
 				for name, desc in pairs( COMMAND_HELP ) do
@@ -32,7 +43,7 @@ local VALID_COMMANDS = {
 						{ name = "Hosting", value = "To host an event use the **!create** command inside this DM.\nOnce created you will be sent more instructions here (regarding configuration and publishing of your event)" },
 						{ name = "Responding", value = "If you want to let the host of an event know whether or not you're coming, use **!yes**, **!no** or **!maybe** inside this DM. The event manager will be notified." },
 						{ name = "Current Event", value = "If you'd like to see information regarding the current event visit the $HOST_CHANNEL inside the $GUILD (BG'n'S server)." },
-						{ name = "Further Commands", value = "Use **!help commands ~~[command]~~** to see information on all commands. If a command name is provided only information for that command will be shown."}
+						{ name = "Further Commands", value = "Use **!help commands** to see information on all commands.\n\nIf you're only interested in certain commands, provide the names of the commands as well to see information for those commands only (eg: !help commands create)."}
 					}
 				}
 			}
@@ -107,6 +118,42 @@ local VALID_COMMANDS = {
 	end
 }
 
+-- Generate commands dynamically for the following properties. The function will simply change the property key-value of the users event.
+local VALID_FIELDS = { "title", "description", "timeframe", "location" }
+for i = 1, #VALID_FIELDS do
+	local field = VALID_FIELDS[ i ]
+
+	local name = field:sub( 1, 1 ):upper() .. field:sub( 2 )
+	COMMAND_HELP[ "set" .. name ] = "Set the field " .. field .. " on your event to the value provided (eg: !set" .. name .. " This is my title).\n\nIf the event is published all users that have RSVP'd will be notified of the change."
+	VALID_COMMANDS[ "set" .. name ] = function( command, message, ... )
+		local user = message.author
+		if not events:getEvent( user ) then
+			-- This user owns no event
+			log.w("Cannot set field " .. field .." because the user ("..tostring( user )..") has no event")
+			local current = events:getCurrentEvent()
+			reporter:send( user, "Failed to set " .. field, "You don't own any events. Create one using **!create**", current and { name = "Change current event details", value = "As of this version (of the bot), only the event author can change details regarding the current event. Contact the host here: <@" .. current.author .. ">"} or nil )
+		else
+			if not events:updateEvent( user, field, ... ) then
+				log.c("Failed to set field '"..field.."' for event owned by " .. tostring( user ))
+				reporter:send( user, "Failed to set " .. field, "Unknown error occurred. Please try again later, or contact <@157827690668359681> directly for assistance" )
+			end
+		end
+	end
+
+	COMMAND_HELP[ "get" .. name ] = "Returns the value for the field '" .. field .. "' in your event."
+	VALID_COMMANDS[ "get" .. name ] = function( command, message, ... )
+		local user = message.author
+		local e = events:getEvent( user )
+		if not e then
+			local current = events:getCurrentEvent()
+			reporter:send( user, "Failed to get " .. field, "You don't own any events. Create one using **!create**", current and { name = "Get current event details", value = "See the BGnS planning channel for information regarding the current event" } or nil )
+		else
+			log.i("Returning information for field '"..tostring( field ).."'")
+			reporter:send( user, "Property - " .. name, "The " .. field .. " property for your event is '"..tostring( e[ field ] ).."'. Change with **!set" .. name .. "**" )
+		end
+	end
+end
+
 return {
 	check = function() return HOST_CHANNEL and CLIENT and CHANNEL and GUILD end,
 	fragmentCommand = function( self, message )
@@ -122,7 +169,7 @@ return {
 		parts = parts or self:fragmentCommand( message )
 		
 		if VALID_COMMANDS[ parts[ 1 ] ] then
-			VALID_COMMANDS[ parts[ 1 ] ]( self, message, parts[ 2 ] )
+			VALID_COMMANDS[ parts[ 1 ] ]( self, message, parts[ 2 ], unpack( splitArguments( parts[ 2 ] ) ) )
 		else
 			reporter:send( message.author, "Invalid command", "The command you sent was of valid syntax but references an unknown command. Did you make a typing mistake?" )
 		end

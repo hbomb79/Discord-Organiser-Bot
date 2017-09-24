@@ -1,5 +1,3 @@
-local VALID_FIELDS = { "title", "description", "timeframe", "location" }
-
 local function createNewEvent( user )
 	return {
 		title = "No Title",
@@ -74,7 +72,7 @@ events.pushCurrentEvent = function( self )
 
 end
 
-events.updateCurrentEvent = function( self, field, value )
+events.updateEvent = function( self, user, field, value )
 
 end
 
