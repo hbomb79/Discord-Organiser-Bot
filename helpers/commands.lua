@@ -19,20 +19,36 @@ local VALID_COMMANDS = {
 		if args[ 1 ] == "commands" then
 			if args[ 2 ] then
 				log.i("Serving help information for requested commands")
+				local fields, invalidFields = {}, {}
 				for i = 2, #args do
 					local com = args[ i ]
 					if COMMAND_HELP[ com ] then
 						log.i("Serving help for cmd " .. com)
-						reporter:info( message.author, "Help ["..com.."]", COMMAND_HELP[ com ] )
+						fields[ #fields + 1 ] = { name = "Help ["..com.."]", value = COMMAND_HELP[ com ] }
 					else
 						log.w("Help information not available for "..com)
-						reporter:failure( message.author, "Help ["..com.."]", "Unknown command '"..com.."'" )
+						invalidFields[ #invalidFields + 1 ] = com
 					end
 				end
-			else
-				for name, desc in pairs( COMMAND_HELP ) do
-					reporter:info( message.author, "Help ["..name.."]", desc )
+
+				reporter:info( message.author, "Command Help", "Below is a list of help information for each of the commands you requested", unpack( fields ) )
+
+				if #invalidFields >= 1 then
+					local str = ""
+					for i = 1, #invalidFields do
+						str = str .. "'" .. invalidFields[ i ] .. "'"
+						if i ~= #invalidFields then str = str .. ( #invalidFields - i > 1 and ", " or " or " ) end
+					end
+
+					reporter:warning( message.author, "Command Help", "We could not find command help for " .. str .. " because the commands don't exist" )
 				end
+			else
+				local fields = {}
+				for name, desc in pairs( COMMAND_HELP ) do
+					fields[ #fields + 1 ] = { name = "!" .. name, value = desc }
+				end
+
+				reporter:info( message.author, "Command Help", "Below is a list of help information for each of the commands you can use. " .. tostring( #fields ), unpack( fields ) )
 			end
 		else
 			message.author:sendMessage {
