@@ -1,5 +1,5 @@
 local function out( p, m )
-	print( ("[%s] %s"):format( p, m ) )
+	print( ("["..os.clock().."][%s] %s"):format( p, m ) )
 end
 
 return {
