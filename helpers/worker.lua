@@ -62,6 +62,7 @@ return {
 			restrict:restrictUser( author.id )
 
 			reporter:send( author, "User Restricted", "Your account has been restricted due to heavy inbound traffic. This restriction will automatically be lifted in a few seconds.\n\nFurther abuse will lead to permanent blacklisting.")
+			return
 		end
 
 		log.i("Adding message to queue (position #"..#self.queue..").")
