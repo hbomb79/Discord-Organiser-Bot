@@ -1,4 +1,7 @@
-local function out( p, m ) print( ("["..os.clock().."][%s] %s"):format( p, m ) ) end
+local function out( p, m )
+	print( ("["..os.clock().."][%s] %s"):format( p, m ) )
+end
+
 
 return {
 	i = function( m ) out( "INFO", m ) end,

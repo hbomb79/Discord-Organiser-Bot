@@ -24,7 +24,7 @@ local VALID_COMMANDS = {
 					local com = args[ i ]
 					if COMMAND_HELP[ com ] then
 						log.i("Serving help for cmd " .. com)
-						fields[ #fields + 1 ] = { name = "Help ["..com.."]", value = COMMAND_HELP[ com ] }
+						fields[ #fields + 1 ] = { name = "!"..com, value = COMMAND_HELP[ com ] }
 					else
 						log.w("Help information not available for "..com)
 						invalidFields[ #invalidFields + 1 ] = com
@@ -51,18 +51,12 @@ local VALID_COMMANDS = {
 				reporter:info( message.author, "Command Help", "Below is a list of help information for each of the commands you can use. " .. tostring( #fields ), unpack( fields ) )
 			end
 		else
-			message.author:sendMessage {
-				embed = {
-					title = "Hoorah! You're ready to learn a little bit about meee!",
-					description = "Using this bot is dead simple! Before we get going select what information you need\n\n",
-					fields = {
-						{ name = "Hosting", value = "To host an event use the **!create** command inside this DM.\nOnce created you will be sent more instructions here (regarding configuration and publishing of your event)" },
-						{ name = "Responding", value = "If you want to let the host of an event know whether or not you're coming, use **!yes**, **!no** or **!maybe** inside this DM. The event manager will be notified." },
-						{ name = "Current Event", value = "If you'd like to see information regarding the current event visit the $HOST_CHANNEL inside the $GUILD (BG'n'S server)." },
-						{ name = "Further Commands", value = "Use **!help commands** to see information on all commands.\n\nIf you're only interested in certain commands, provide the names of the commands as well to see information for those commands only (eg: !help commands create)."}
-					}
-				}
-			}
+			reporter:info( message.author, "Hoorah! You're ready to learn a little bit about meee!", "Using this bot is dead simple! Before we get going select what information you need\n\n", 
+				{ name = "Hosting", value = "To host an event use the **!create** command inside this DM.\nOnce created you will be sent more instructions here (regarding configuration and publishing of your event)" },
+				{ name = "Responding", value = "If you want to let the host of an event know whether or not you're coming, use **!yes**, **!no** or **!maybe** inside this DM. The event manager will be notified." },
+				{ name = "Current Event", value = "If you'd like to see information regarding the current event visit the $HOST_CHANNEL inside the $GUILD (BG'n'S server)." },
+				{ name = "Further Commands", value = "Use **!help commands** to see information on all commands.\n\nIf you're only interested in certain commands, provide the names of the commands as well to see information for those commands only (eg: !help commands create)."}
+			)
 		end
 	end,
 
@@ -228,7 +222,7 @@ return {
 		if VALID_COMMANDS[ parts[ 1 ] ] then
 			VALID_COMMANDS[ parts[ 1 ] ]( self, message, parts[ 2 ], unpack( splitArguments( parts[ 2 ] ) ) )
 		else
-			reporter:failure( message.author, "Invalid command", "The command you sent was of valid syntax but references an unknown command. Did you make a typing mistake?" )
+			reporter:failure( message.author, "Invalid command", "The command you sent was of valid syntax but references an unknown command. Did you make a typing mistake?\n\nCheck out **!help**, or **!help commands** for more information" )
 		end
 	end
 }

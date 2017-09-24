@@ -127,7 +127,7 @@ events.pushEvent = function( self, user, target )
 	local event = self:getEvent { id = user }
 
 	if target == CHANNEL then target:bulkDelete() end
-	reporter:info(
+	local r = reporter:info(
 		target, event.title, event.desc,
 		{ name = "Location", value = event.location, inline = true },
 		{ name = "Timeframe", value = event.timeframe, inline = true },

@@ -1,4 +1,3 @@
-print "HIT"
 -- Define constants here to allow quick access in future.
 HOST_ROLE, HOST_CHANNEL, BOT_SNOWFLAKE = "", "361062102732898314", "361038817840332800"
 commands, reporter, restrict, events, jpersist, log = require "helpers.commands", require "helpers.reporter", require "helpers.restrict", require "helpers.events", require "helpers.jpersist", require "helpers.logger"
@@ -97,7 +96,7 @@ return {
 					if not validCommand then
 						-- Invalid syntax
 						log.i "Message received was malformed -- notifying user."
-						reporter:warning( author, "Command Malformed", "The command sent to this bot was not recognised. Ensure format is '!command' and check for typing mistakes" )
+						reporter:warning( author, "Command Malformed", "The command sent to this bot was not recognised. Ensure format is '!command' and check for typing mistakes\n\nTry **!help**" )
 					else
 						log.i "Message received is a valid command, executing command"
 						commands:runCommand( content, validCommand )
