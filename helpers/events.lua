@@ -117,6 +117,7 @@ events.refreshRemote = function( self )
 	else
 		CHANNEL:bulkDelete()
 		reporter:info( CHANNEL, "No Event", "No one has published an event yet. Send this bot the message '!help' (via direct messaging, accessible by clicking the bots icon).\n\nThe bot will respond with helpful information regarding how to use the event planner." )
+		-- CHANNEL.lastMessage:pin()
 	end
 end
 
@@ -131,8 +132,10 @@ events.pushEvent = function( self, user, target )
 		target, event.title, event.desc,
 		{ name = "Location", value = event.location, inline = true },
 		{ name = "Timeframe", value = event.timeframe, inline = true },
-		{ name = "Attendees", value = "Literally nobody -- This doesn't work yet" }
+		{ name = "Attendees", value = "@everyone RSVP by sending **!yes**, **!no** or **!maybe** in a direct message to this bot.\n\n**RSVPs**\nLiterally nobody -- This doesn't work yet." }
 	)
+
+	-- if target == CHANNEL then CHANNEL.lastMessage:pin() end
 end
 
 events.pushPublishedEvent = function( self, target )
