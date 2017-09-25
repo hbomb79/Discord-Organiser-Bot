@@ -1,4 +1,5 @@
 .token
-banned.cfg
-events.cfg
+.banned
+.events
 gateway.json
+old/
