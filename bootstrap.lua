@@ -24,12 +24,10 @@ assert( discordia, "Failed to bootstrap: Discordia failed to load" )
 Class = require "src.lib.class"
 assert( type( class ) == "function" and type( Class ) == "table" and abstract and mixin and extends, "Failed to bootstrap: Class library references could not be found" )
 
--- Include the Worker class
 local Logger = require "src.client.Logger"
-local Worker = require "src.client.Worker"
 
 -- Instantiate a Worker
-local ok, err = pcall( Worker )
+local ok, err = pcall( require "src.client.Worker" )
 if not ok then
 	Logger.f( "Worker instance failed", tostring( err ) )
 	return false

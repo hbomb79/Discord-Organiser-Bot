@@ -33,5 +33,10 @@ function MessageManager:handleInbound( message )
 	return true
 end
 
+function MessageManager:addToQueue( message )
+
+end
+
+
 extends "Manager"
 return MessageManager:compile()
