@@ -208,5 +208,35 @@ function EventManager:refreshRemote()
 	end
 end
 
+--[[
+	@instance
+	@desc WIP
+]]
+function EventManager:updateEvent( userID, field, value )
+	local name = self.worker.client:getUser( userID ).fullname
+	Logger.i("Attempting to update " .. name .. " event (field '"..tostring( field ) .. "', value '"..tostring( value ).."')")
+
+	local event = self:getEvent( userID )
+	if not event then
+		Logger.w( "No event exists for user " .. name, "Unable to edit fields on non-existent events... duh" )
+	else
+		event[ field ] = value
+		JSONPersist.saveToFile( ".events", self.events )
+
+		if event.published then
+			-- The field has been updated. If the event has been published let all members that have RSVP'd know the event has been updated
+			local rsvps = event.responses
+			for userID, response in pairs( rsvps ) do
+				-- local m = GUILD:getMember( userID )
+				-- log.i( "TODO: Send edit information to user " .. tostring( m ) .. " | userID: " .. tostring( userID ) )
+			end
+
+			self:refreshRemote()
+		end
+
+		return true
+	end
+end
+
 extends "Manager"
 return EventManager:compile()

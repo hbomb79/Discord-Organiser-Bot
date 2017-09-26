@@ -187,15 +187,62 @@ commands = {
 		end
 	},
 	view = {
-		help = ""
+		help = "*TODO*"
 	},
 
 	banUser = {
-		help = ""
+		help = "*TODO*"
 	},
 	unbanUser = {
-		help = ""
+		help = "*TODO*"
 	}
 }
+
+-- Generate commands dynamically for the following properties. The function will simply change the property key-value of the users event.
+local VALID_FIELDS = { "title", "desc", "timeframe", "location" }
+for i = 1, #VALID_FIELDS do
+	local field = VALID_FIELDS[ i ]
+
+	local name = field:sub( 1, 1 ):upper() .. field:sub( 2 )
+	commands[ "set" .. name ] = {
+		help = "Set the field " .. field .. " on your event to the value provided (eg: !set" .. name .. " This is my title).\n\nIf the event is published all users that have RSVP'd will be notified of the change.",
+		action = function( worker, message, value )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "Attempting to set '"..field.."' to " .. value .."' for event owned by " .. user.fullname, userID )
+
+			if not events:getEvent( userID ) then
+				Logger.w( "Cannot set field " .. field .." because the user (".. user.fullname ..") has no event" )
+				local current = events:getPublishedEvent()
+				Reporter.warning( user, "Failed to set " .. field, "You don't own any events. Create one using **!create**", current and { name = "Change current event details", value = "As of this version (of the bot), only the event author can change details regarding the current event. Contact the host here: <@" .. current.author .. ">"} or nil )
+			else
+				if events:updateEvent( userID, field, value ) then
+					Logger.s "Updated event successfully"
+					Reporter.success( user, "Successfully set field", "The " .. field .. " property for your event is now '".. value.."'.")
+				else
+					Logger.e( "Failed to set field '"..field.."' for event owned by " .. tostring( user.fullname ) )
+					Reporter.failure( user, "Failed to set " .. field, "Unknown error occurred. Please try again later, or contact <@157827690668359681> directly for assistance" )
+				end
+			end
+		end
+	}
+
+	commands[ "get" .. name ] = {
+		help = "Returns the value for the field '" .. field .. "' in your event.",
+		action = function( worker, message, ... )
+			local user, events = message.author, worker.eventManager
+			Logger.i( "Attempting to get field '"..field.."' for event owned by " .. user.fullname, user.id )
+
+			local e = events:getEvent( user.id )
+			if not e then
+				local current = events:getPublishedEvent()
+				Reporter.warning( user, "Failed to get " .. field, "You don't own any events. Create one using **!create**", current and { name = "Get current event details", value = "See the BGnS planning channel for information regarding the current event" } or nil )
+			else
+				Logger.i( "Returning information for field '"..tostring( field ).."'" )
+				Reporter.info( user, "Property - " .. name, "The " .. field .. " property for your event is '"..tostring( e[ field ] ).."'. Change with **!set" .. name .. "**" )
+			end
+		end
+	}
+end
 
 return commands
