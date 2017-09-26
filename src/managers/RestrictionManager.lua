@@ -1,4 +1,4 @@
--- local JSONPersist = require "src.lib.JSONPersist"
+local JSONPersist = require "src.helpers.JSONPersist"
 local Logger = require "src.client.Logger"
 
 --[[
@@ -19,7 +19,7 @@ local RestrictionManager = class "RestrictionManager" {
 ]]
 function RestrictionManager:__init__( ... )
 	self:super( ... )
-	self:loadBannedUsers()
+	self.bannedUsers = JSONPersist.loadFromFile ".banned"
 end
 
 --[[
@@ -45,7 +45,10 @@ end
 	@desc
 ]]
 function RestrictionManager:banUser( userID )
+	self.bannedUsers[ userID ] = true
+	JSONPersist.saveToFile( ".banned", self.bannedUsers )
 
+	Logger.s( "Banned user " .. self.worker.client:getUser( userID ).fullname, userID )
 end
 
 --[[
@@ -53,15 +56,15 @@ end
 	@desc
 ]]
 function RestrictionManager:isUserBanned( userID )
-
+	return self.bannedUsers[ userID ]
 end
 
 --[[
 	@instance
 	@desc
 ]]
-function RestrictionManager:restrictUser()
-
+function RestrictionManager:restrictUser( userID )
+	self.restrictedUsers[ userID ] = 0
 end
 
 --[[
@@ -69,7 +72,7 @@ end
 	@desc
 ]]
 function RestrictionManager:isUserRestricted( userID, orBanned )
-
+	return self.restrictedUsers[ userID ] or ( orBanned and self.bannedUsers[ userID ] )
 end
 
 --[[
@@ -77,7 +80,24 @@ end
 	@desc
 ]]
 function RestrictionManager:reportRestrictionViolation( userID )
+	local name = self.worker.client:getUser( userID ).fullname
+	Logger.i( "Attempting to record restriction violation for user " .. name, userID )
 
+	if not self.restrictedUsers[ userID ] then
+		Logger.w( "No restriction on record for " .. name, "Restricting user now" )
+		self:restrictUser( userID )
+	end
+
+	self.restrictedUsers[ userID ] = self.restrictedUsers[ userID ] + 1
+	Logger.i("User " .. name .. " has violated their restriction " .. self.restrictedUsers[ userID ] .. " times" )
+
+	if self.restrictedUsers[ userID ] >= 10 then
+		Logger.w( "Banning user " .. name .. " for excessive restriction violation" )
+		self:banUser( userID )
+	end
+
+	Logger.s( "Reported restriction violation for " .. name )
+	return true
 end
 
 extends "Manager"

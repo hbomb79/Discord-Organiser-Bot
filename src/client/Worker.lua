@@ -18,6 +18,7 @@ local Worker = class "Worker" {
 
 	tokenLocation = ".token";
 	alive = false;
+	workerRunning = false;
 
 	client = false;
 	cachedChannel = false;
@@ -34,8 +35,10 @@ function Worker:__init__( ... )
 	Logger.i( "Instantiating Worker", "Attempting to bind Worker to Logger statically" )
 	Logger.bind( self )
 
-	Logger.i( "Attempting to bind manager (MessageManager)" )
+	Logger.i( "Attempting to bind managers (MessageManager, EventManager) to worker" )
 	self.messageManager = Logger.assert( require( "src.managers.MessageManager" )( self ), "Failed to bind MessageManager", "Bound MessageManager" )
+	self.eventManager = Logger.assert( require( "src.managers.EventManager" )( self ), "Failed to bind EventManager", "Bound EventManager" )
+	Logger.s "Bound managers to Worker"
 
 	-- Create the Discordia client
 	self.client = discordia.Client( self.clientOptions )
@@ -68,7 +71,10 @@ function Worker:start()
 	Logger.s "Fetching guild and channel information"
 
 	self.client:on( "messageCreate", function( message ) self.messageManager:handleInbound( message ) end )
+	self.alive = true
 	Logger.s "Worker ready -- waiting for messages"
+
+	self.eventManager:refreshRemote()
 end
 
 --[[
@@ -81,7 +87,7 @@ function Worker:kill()
 		return Logger.w "Cannot kill worker. No client bound. There is NO active connection -- no need to kill"
 	end
 
-	return self.client:stop()
+	self.client:stop()
 end
 
 configureConstructor {
