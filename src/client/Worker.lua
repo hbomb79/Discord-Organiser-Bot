@@ -9,7 +9,7 @@ local discordia = luvitRequire "discordia"
 		- Command parsing and execution	
 ]]
 
-Logger.i "Compiling Worker"
+Logger.d "Compiling Worker"
 local Worker = class "Worker" {
 	static = {
 		GUILD_ID = "158038708057145344",

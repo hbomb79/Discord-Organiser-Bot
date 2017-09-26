@@ -7,7 +7,7 @@ local Class = require "src.lib.class"
 	the parsing and execution on incoming messages (caught via messageCreate event).
 ]]
 
-Logger.i "Compiling MessageManager"
+Logger.d "Compiling MessageManager"
 local MessageManager = class "MessageManager" {
 	owner = false;
 }

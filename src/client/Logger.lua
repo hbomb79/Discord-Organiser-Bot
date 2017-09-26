@@ -1,5 +1,13 @@
 local Class = require "src.lib.class"
 
+local function formLog( clock, mode, msg, fg, bg, attr, entire )
+	if entire then
+		return( "\27[%s;%s" .. (attr and ";" .. attr or "") .. "m[%s] [%s] %s\27[0m" ):format( fg, bg, clock, mode, msg )
+	else
+		return( "\27[37m[%s] \27[%s;%sm[%s]\27[37m %s\27[0m" ):format( clock, fg, bg, mode, msg )
+	end
+end
+
 --[[
 	A basic class that provides static function for outputting at various levels (info, warning, error, fatal) as well
 	as a custom assertion function that automatically closes the active worker when assertion fails.
@@ -8,6 +16,15 @@ local Class = require "src.lib.class"
 local Logger = class "Logger" {
 	static = {
 		worker = false;
+		debug = true;
+
+		colours = {
+			INFO = { 37, 49, false, true },
+			DEBUG = { 37, 49, "2;3", true },
+			WARNING = { 33, 49 },
+			ERROR = { 31, 49, "1" },
+			FATAL = { 37, 41, "1", true },
+		}
 	}
 }
 
@@ -16,7 +33,7 @@ local Logger = class "Logger" {
 	@desc WIP
 ]]
 function Logger.static.out( mode, ... )
-	print( ("[%s][%s] %s"):format( os.clock(), mode, table.concat( { ... }, " | " ) ) )
+	print( formLog( os.clock(), mode, table.concat( { ... }, " | " ), unpack( Logger.colours[ mode ] ) ) )
 end
 
 --[[
@@ -25,6 +42,15 @@ end
 ]]
 function Logger.static.i( ... )
 	Logger.static.out( "INFO", ... )
+end
+
+--[[
+	@static
+	@desc WIP
+]]
+function Logger.static.d( ... )
+	if not Logger.debug then return end
+	Logger.static.out( "DEBUG", ... )
 end
 
 --[[
@@ -62,9 +88,9 @@ function Logger.static.assert( v, failureMessage, successMessage, worker )
 
 		m("Failed to assert '"..tostring( v ).."'" .. " | " .. ( failureMessage or "" ) .. " | " .. ( worker and "Attempting to gracefully close Discordapp gateway (via worker directly -- killing)" or "No worker directly accessible. Cannot gracfully close -- forcing termination" ) )
 		
-		if worker then print( tostring( worker ) ) worker:kill() end
+		if worker then worker:kill() end
 	else
-		Logger.i( "Successfully asserted '"..tostring( v ).."'", successMessage or "" )
+		Logger.d( "Successfully asserted '"..tostring( v ).."'", successMessage or "" )
 		return v
 	end
 end

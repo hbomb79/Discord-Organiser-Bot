@@ -4,7 +4,7 @@ local Logger = require "src.client.Logger"
 	WIP
 ]]
 
-Logger.i "Compiling JSONPersist"
+Logger.d "Compiling JSONPersist"
 local JSONPersist = class "JSONPersist" {}
 
 --[[

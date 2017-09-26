@@ -5,7 +5,7 @@ local Logger = require "src.client.Logger"
 	WIP
 ]]
 
-Logger.i "Compiling RestrictionManager"
+Logger.d "Compiling RestrictionManager"
 local RestrictionManager = class "RestrictionManager" {
 	restrictedUsers = {};
 	bannedUsers = {};
