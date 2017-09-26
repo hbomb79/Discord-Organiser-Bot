@@ -18,7 +18,7 @@ local Logger = class "Logger" {
 		worker = false;
 		debug = true;
 
-		colours = {
+		modes = {
 			INFO = { 36, 49 },
 			SUCCESS = { 32, 49, "3" },
 			DEBUG = { 37, 49, "2;3", true },
@@ -34,56 +34,7 @@ local Logger = class "Logger" {
 	@desc WIP
 ]]
 function Logger.static.out( mode, ... )
-	print( formLog( os.date "%F %T", mode, table.concat( { ... }, " | " ), unpack( Logger.colours[ mode ] ) ) )
-end
-
---[[
-	@static
-	@desc WIP
-]]
-function Logger.static.i( ... )
-	Logger.static.out( "INFO", ... )
-end
-
---[[
-	@static
-	@desc WIP
-]]
-function Logger.static.s( ... )
-	Logger.static.out( "SUCCESS", ... )
-end
-
---[[
-	@static
-	@desc WIP
-]]
-function Logger.static.d( ... )
-	if not Logger.debug then return end
-	Logger.static.out( "DEBUG", ... )
-end
-
---[[
-	@static
-	@desc WIP
-]]
-function Logger.static.w( ... )
-	Logger.static.out( "WARNING", ... )
-end
-
---[[
-	@static
-	@desc WIP
-]]
-function Logger.static.e( ... )
-	Logger.static.out( "ERROR", ... )
-end
-
---[[
-	@static
-	@desc WIP
-]]
-function Logger.static.f( ... )
-	Logger.static.out( "FATAL", ... )
+	print( formLog( os.date "%F %T", mode, table.concat( { ... }, " | " ), unpack( Logger.modes[ mode ] ) ) )
 end
 
 --[[
@@ -117,6 +68,13 @@ function Logger.static.bind( worker )
 		Logger.static.worker = worker
 
 		return true
+	end
+end
+
+-- Dynamically generate a log function for each mode (name of the function is the first character of the mode in lowercase. IE: The function for mode 'WANRING' is 'Logger.w')
+for k in pairs( Logger.static.modes ) do
+	Logger.static[ k:sub( 1, 1 ):lower() ] = function( ... )
+		Logger.static.out( k, ... )
 	end
 end
 
