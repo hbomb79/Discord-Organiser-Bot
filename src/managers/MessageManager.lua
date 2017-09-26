@@ -111,6 +111,7 @@ function MessageManager:startQueue()
 		Logger.i( "Starting processing of next queue item (" .. tostring( item ) .. ", with content: "..tostring( item.content )..")" )
 
 		if checkMutalGuild( item.author ) then
+			author:getPrivateChannel():broadcastTyping()
 			local state = self:checkCommandValid( item.content )
 			if state == 0 then
 				Logger.w( "Cannot process command " .. item.content, "Invalid syntax" )
