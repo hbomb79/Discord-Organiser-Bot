@@ -19,7 +19,8 @@ local Logger = class "Logger" {
 		debug = true;
 
 		colours = {
-			INFO = { 37, 49, false, true },
+			INFO = { 36, 49 },
+			SUCCESS = { 32, 49, "3" },
 			DEBUG = { 37, 49, "2;3", true },
 			WARNING = { 33, 49 },
 			ERROR = { 31, 49, "1" },
@@ -42,6 +43,14 @@ end
 ]]
 function Logger.static.i( ... )
 	Logger.static.out( "INFO", ... )
+end
+
+--[[
+	@static
+	@desc WIP
+]]
+function Logger.static.s( ... )
+	Logger.static.out( "SUCCESS", ... )
 end
 
 --[[

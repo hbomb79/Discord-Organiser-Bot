@@ -33,4 +33,4 @@ if not ok then
 	return false
 end
 
-Logger.i "Finished bootstrap -- Control given to worker"
+Logger.s "Finished bootstrap -- Control given to worker"

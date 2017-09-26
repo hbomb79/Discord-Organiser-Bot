@@ -48,7 +48,7 @@ function Worker:__init__( ... )
 
 	-- Bind a ready callback (only need this once)
 	self.client:once( "ready", function()
-		Logger.i "Successfully connected to Discordapp gateway. Starting worker"
+		Logger.s "Successfully connected to Discordapp gateway. Starting worker"
 		self:start()
 	end )
 
@@ -62,11 +62,13 @@ end
 		  messages to the MessageManager (self.messageManager)
 ]]
 function Worker:start()
-	Logger.i "Fetching guild and channel information"
 	self.cachedGuild = Logger.assert( self.client:getGuild( Worker.GUILD_ID ), "Failed to fetch guild information", "Saved guild information" )
 	self.cachedChannel = Logger.assert( self.cachedGuild:getChannel( Worker.CHANNEL_ID ), "Failed to fetch channel information", "Saved channel information" )
 
+	Logger.s "Fetching guild and channel information"
+
 	self.client:on( "messageCreate", function( message ) self.messageManager:handleInbound( message ) end )
+	Logger.s "Worker ready -- waiting for messages"
 end
 
 --[[
