@@ -99,7 +99,7 @@ function EventManager:removeEvent( userID, noUnpublish )
 			return Logger.e( "Attempting to remove '" .. name .. "' event although it has already been published -- refusing to remove" )
 		else
 			Logger.i( "Attempting to remove '" .. name .. "' event although it has already been published -- unpublishing event first" )
-			self:unpublish( userID )
+			self:unpublishEvent( userID )
 		end
 	end
 
