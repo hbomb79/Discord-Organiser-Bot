@@ -145,7 +145,7 @@ commands = {
 				Logger.w "User has no events but is trying to publish. Notifying user."
 				Reporter.warning( user, "Failed to publish", "You don't own any events. Create an event using **!create** before trying to publish" )
 			elseif current then
-				if event.author == userID then
+				if current.author == userID then
 					Logger.w "User has already published their event"
 					Reporter.warning( user, "Already published", "Your event is already published -- you can see it in the BGnS planning chat. Un-publish with **!unpublish**, or delete completely with **!delete**.\n\nYou can still change details of your event, anyone that has RSVP'd will be notified (via direct messaging) of any changes you make.")
 				else
