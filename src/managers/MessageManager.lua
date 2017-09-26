@@ -23,12 +23,13 @@ end
 	@desc WIP
 ]]
 function MessageManager:handleInbound( message )
+	if message.author.bot or self.restrictionManager:isUserRestricted( message.author.id, true ) then return end
+
+	Logger.i( "Handling inbound message " .. tostring( message ) .. " from " .. tostring( message.author ) )
 	if not self.owner then
 		Logger.e("No owner bound to this manager instance (MessageManager). Cannot continue -- ignoring message")
 		return false
 	end
-
-	-- if self.restrictionManager then
 
 	return true
 end

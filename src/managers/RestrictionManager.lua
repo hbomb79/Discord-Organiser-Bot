@@ -68,7 +68,7 @@ end
 	@instance
 	@desc
 ]]
-function RestrictionManager:isUserRestricted( userID, only )
+function RestrictionManager:isUserRestricted( userID, orBanned )
 
 end
 
