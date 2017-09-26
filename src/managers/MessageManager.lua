@@ -79,8 +79,10 @@ function MessageManager:addToQueue( message )
 	local reqs = self.userRequests[ uID ] or 0
 
 	if reqs >= 3 then
+		Reporter.warning( message.author, "User Restricted", "Your user account has been restricted. Messages you have sent are placed on hold and will be handled shortly.\n\nThis restriction will be lifted automatically in a few seconds." )
 		Logger.w( "User " .. message.author.fullname .. " already has " .. reqs .. " items in the queue. Restricting user." )
-		return self.restrictionManager:restrictUser( uID )
+		self.restrictionManager:restrictUser( uID )
+		return
 	else
 		Logger.i( "Adding message " .. tostring( message ) .. " to queue at position #" .. tostring( #self.queue + 1 ) )
 		self.userRequests[ uID ] = reqs + 1
@@ -105,29 +107,37 @@ function MessageManager:startQueue()
 
 	Logger.d( "Starting worker", "Items in queue: " .. #queue )
 	self.worker.workerRunning = true
+	local userReqs = self.userRequests
 	while #queue > 0 and self.worker.workerRunning do
 		local item = queue[ 1 ]
 		local author = item.author
 		Logger.i( "Starting processing of next queue item (" .. tostring( item ) .. ", with content: "..tostring( item.content )..")" )
 
-		if checkMutalGuild( item.author ) then
-			author:getPrivateChannel():broadcastTyping()
-			local state = self:checkCommandValid( item.content )
-			if state == 0 then
-				Logger.w( "Cannot process command " .. item.content, "Invalid syntax" )
-				Reporter.warning( author, "Failed to Process Command", "The command is syntactically invalid. Ensure it is in the form **!<commandName> [arg1, [arg2, [...]]]**" )
-			elseif state == 1 then
-				Logger.w( "Cannot process command " .. item.content, "Does not exist" )
-				Reporter.warning( author, "Failed to Process Command", "The command you requested does not exist. Check for typos and ensure you have whitespace between your arguments" )
-			elseif state == 2 then
-				Logger.i( "Executing command " .. item.content )
-				self:executeCommand( item, item.content )
-			end
-		else Reporter.warning( author, "Failed to Process Command", "Your user is not a member of the target guild. You are not permitted to execute commands via this bot.\n\nContact the guild owner if you believe this warning is incorrect" ) end
+		if not self.restrictionManager:isUserRestricted( author.id, true ) then
+			if checkMutalGuild( author ) then
+				author:getPrivateChannel():broadcastTyping()
+				local state = self:checkCommandValid( item.content )
+				if state == 0 then
+					Logger.w( "Cannot process command " .. item.content, "Invalid syntax" )
+					Reporter.warning( author, "Failed to Process Command", "The command is syntactically invalid. Ensure it is in the form **!<commandName> [arg1, [arg2, [...]]]**" )
+				elseif state == 1 then
+					Logger.w( "Cannot process command " .. item.content, "Does not exist" )
+					Reporter.warning( author, "Failed to Process Command", "The command you requested does not exist. Check for typos and ensure you have whitespace between your arguments" )
+				elseif state == 2 then
+					Logger.i( "Executing command " .. item.content )
+					self:executeCommand( item, item.content )
+				end
+			else Reporter.warning( author, "Failed to Process Command", "Your user is not a member of the target guild. You are not permitted to execute commands via this bot.\n\nContact the guild owner if you believe this warning is incorrect" ) end
+		else Logger.w( "Ignoring queue item -- author", author.fullname .. " is restricted OR banned" ) end
 
-		self.userRequests[ author.id ] = self.userRequests[ author.id ] - 1
-		Logger.d( "User '" .. author.fullname .. "' now has " .. self.userRequests[ author.id ] .. " requests in the queue" )
+		userReqs[ author.id ] = userReqs[ author.id ] - 1
+		Logger.d( "User '" .. author.fullname .. "' now has " .. userReqs[ author.id ] .. " requests in the queue" )
 		table.remove( queue, 1 )
+
+		if userReqs[ author.id ] == 0 and self.restrictionManager:isUserRestricted( author.id ) then
+			self.restrictionManager.restrictedUsers[ author.id ] = nil
+			Logger.i( "User " .. author.fullname .. " has no requests in queue and has been unrestricted" )
+		end
 
 		Logger.i( "Removed item from queue. Items remaining in queue: " .. #queue )
 	end

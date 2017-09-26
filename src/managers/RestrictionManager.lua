@@ -22,22 +22,6 @@ function RestrictionManager:__init__( ... )
 	self.bannedUsers = JSONPersist.loadFromFile ".banned"
 end
 
---[[
-	@instance
-	@desc
-]]
-function RestrictionManager:loadBannedUsers()
-
-end
-
---[[
-	@instance
-	@desc
-]]
-function RestrictionManager:saveBannedUsers()
-
-end
-
 -- Main --
 
 --[[
