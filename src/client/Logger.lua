@@ -34,6 +34,7 @@ local Logger = class "Logger" {
 	@desc WIP
 ]]
 function Logger.static.out( mode, ... )
+	if mode == "DEBUG" and not Logger.debug then return end
 	print( formLog( os.date "%F %T", mode, table.concat( { ... }, " | " ), unpack( Logger.modes[ mode ] ) ) )
 end
 
