@@ -66,9 +66,7 @@ function Worker:start()
 	self.cachedGuild = Logger.assert( self.client:getGuild( Worker.GUILD_ID ), "Failed to fetch guild information", "Saved guild information" )
 	self.cachedChannel = Logger.assert( self.cachedGuild:getChannel( Worker.CHANNEL_ID ), "Failed to fetch channel information", "Saved channel information" )
 
-	self.client:on( "messageCreate", function()
-
-	end )
+	self.client:on( "messageCreate", function( message ) self.messageManager:handleInbound( message ) end )
 end
 
 --[[
