@@ -2,9 +2,9 @@ local Class = require "src.lib.class"
 
 local function formLog( clock, mode, msg, fg, bg, attr, entire )
 	if entire then
-		return( "\27[%s;%s" .. (attr and ";" .. attr or "") .. "m[%s] [%s] %s\27[0m" ):format( fg, bg, clock, mode, msg )
+		return( "\27[%s;%s" .. (attr and ";" .. attr or "") .. "m%s | [%s] %s\27[0m" ):format( fg, bg, clock, mode, msg )
 	else
-		return( "\27[37m[%s] \27[%s;%sm[%s]\27[37m %s\27[0m" ):format( clock, fg, bg, mode, msg )
+		return( "\27[37m%s | \27[%s;%sm[%s]\27[37m %s\27[0m" ):format( clock, fg, bg, mode, msg )
 	end
 end
 
@@ -33,7 +33,7 @@ local Logger = class "Logger" {
 	@desc WIP
 ]]
 function Logger.static.out( mode, ... )
-	print( formLog( os.clock(), mode, table.concat( { ... }, " | " ), unpack( Logger.colours[ mode ] ) ) )
+	print( formLog( os.date "%F %T", mode, table.concat( { ... }, " | " ), unpack( Logger.colours[ mode ] ) ) )
 end
 
 --[[
