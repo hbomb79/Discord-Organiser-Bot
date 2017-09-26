@@ -124,13 +124,19 @@ local commands = {
 
 			local published = events:getPublishedEvent()
 			if not published then
-				return Logger.w "Cannot unpublish event, no event is published"
+				Logger.w "Cannot unpublish event, no event is published"
+				Reporter.warning( user, "Failed to Unpublish Event", "No event has been published" )
 			elseif published.author ~= userID then
-				return Logger.w "Cannot unpublish event. The author of the currently published event does not match the issuer of this command"
+				Logger.w "Cannot unpublish event. The author of the currently published event does not match the issuer of this command"
+				Reporter.warning( user, "Failed to Unpublish Event", "You do not own the currently published event. Contact the event host <@"..published.author.."> for more information" )
+			else
+				Logger.s "Confirmed published event is owned by command issuer"
+				if events:unpublishEvent() then
+					Reporter.success( user, "Unpublished Event", "Your event has been unpublished. If you want to delete it entirely use **!cancel**" )
+				else
+					Reporter.failure( user, "Failed to Unpublish Event", "Your event could not be unpublished due to an unknown error. Please try again later, or contact <@157827690668359681> to report" )
+				end
 			end
-
-			Logger.s "Confirmed published event is owned by command issuer"
-			events:unpublishEvent()
 		end
 	},
 	view = {
