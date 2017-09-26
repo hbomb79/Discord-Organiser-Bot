@@ -8,13 +8,60 @@ local Reporter = require "src.helpers.Reporter"
 Logger.d "Building commands list (commands.lua)"
 -- format: command = { help = "help desc", admin = true|false, action = function };
 -- If 'admin' then only users that are administrators on the BGnS guild will be able to execute
-local commands = {
+local commands
+commands = {
 	help = {
 		help = "Display this help menu.\n\nRun **!help commands [command1, command2, ...]** to see help on the given commands (eg: **!help commands create cancel** gives help for the *create* and *cancel* command).",
+		action = function( worker, message, _, ... )
+			local args = { ... }
+			if args[ 1 ] == "commands" then
+				if args[ 2 ] then
+					Logger.i "Serving help information for requested commands"
+					local fields, invalidFields = {}, {}
+					for i = 2, #args do
+						local com = args[ i ]
+						if commands[ com ] then
+							local h = commands[ com ].help
+							Logger.d( "Serving help for cmd " .. com )
+							fields[ #fields + 1 ] = { name = "!"..com, value = #h == 0 and "**HELP UNAVAILABLE**" or h }
+						else
+							Logger.w( "Help information not available for "..com )
+							invalidFields[ #invalidFields + 1 ] = com
+						end
+					end
+
+					Reporter.info( message.author, "Command Help", "Below is a list of help information for each of the commands you requested", unpack( fields ) )
+
+					if #invalidFields >= 1 then
+						local str = ""
+						for i = 1, #invalidFields do
+							str = str .. "'" .. invalidFields[ i ] .. "'"
+							if i ~= #invalidFields then str = str .. ( #invalidFields - i > 1 and ", " or " or " ) end
+						end
+
+						Reporter.warning( message.author, "Command Help", "We could not find command help for " .. str .. " because the commands don't exist" )
+					end
+				else
+					local fields = {}
+					for name, config in pairs( commands ) do
+						fields[ #fields + 1 ] = { name = "!" .. name, value = #config.help == 0 and "**HELP UAVAILABLE**" or config.help }
+					end
+
+					Reporter.info( message.author, "Command Help", "Below is a list of help information for each of the commands you can use. " .. tostring( #fields ), unpack( fields ) )
+				end
+			else
+				Reporter.info( message.author, "Hoorah! You're ready to learn a little bit about meee!", "Using this bot is dead simple! Before we get going select what information you need\n\n", 
+					{ name = "Hosting", value = "To host an event use the **!create** command inside this DM.\nOnce created you will be sent more instructions here (regarding configuration and publishing of your event)" },
+					{ name = "Responding", value = "If you want to let the host of an event know whether or not you're coming, use **!yes**, **!no** or **!maybe** inside this DM. The event manager will be notified." },
+					{ name = "Current Event", value = "If you'd like to see information regarding the current event visit the $HOST_CHANNEL inside the $GUILD (BG'n'S server)." },
+					{ name = "Further Commands", value = "Use **!help commands** to see information on all commands.\n\nIf you're only interested in certain commands, provide the names of the commands as well to see information for those commands only (eg: !help commands create)."}
+				)
+			end
+		end
 	},
 
 	create = {
-		help = "",
+		help = "Creates a new event for the user. If an event already exists (published or not) the command will refuse to complete",
 		action = function( worker, message )
 			local user = message.author
 			local userID = user.id
@@ -38,7 +85,7 @@ local commands = {
 	},
 
 	cancel = {
-		help = "",
+		help = "Removes an UNPUBLISHED event from the records. This has no affect on any other user.\n\nAll data tied to this event will be lost",
 		action = function( worker, message )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -64,7 +111,7 @@ local commands = {
 	},
 
 	delete = {
-		help = "",
+		help = "Removed a PUBLISHED event from the records. All users that RSVP'd to the event will be notified of it's removal.\n\nAll data tied to this event will be lost",
 		action = function( worker, message )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -87,7 +134,7 @@ local commands = {
 	},
 
 	publish = {
-		help = "",
+		help = "Pushes your current event to the BGnS server, allowing other users to see the event and RSVP via DMs to this bot",
 		action = function( worker, message )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -116,7 +163,7 @@ local commands = {
 	},
 
 	unpublish = {
-		help = "",
+		help = "Similar to delete, but doesn't remove event data after unpublishing. All users that RSVP'd to the event will be notified that it is no longer published",
 		action = function( worker, message )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
