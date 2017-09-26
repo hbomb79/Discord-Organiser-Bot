@@ -40,6 +40,7 @@ function CommandHandler:executeCommand( message, command )
 
 	Logger.i( "Executing action for command '" .. commandName .. "'" )
 	fn( self.worker, message, arg, unpack( splitArguments( arg ) ) )
+	Logger.s( "Command for '" .. commandName .. "' executed" )
 end
 
 return abstract( true ):compile()
