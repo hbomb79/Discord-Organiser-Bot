@@ -7,7 +7,7 @@ local function bulkDelete( channel )
 	if #msgs > 1 then
 		channel:bulkDelete( msgs )
 	elseif #msgs == 1 then
-		channel:getLastMessage():delete()
+		msgs:iter()():delete()
 	end
 end
 
