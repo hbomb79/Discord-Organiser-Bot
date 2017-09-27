@@ -186,6 +186,22 @@ commands = {
 			end
 		end
 	},
+
+	yes = {
+		help = "*TODO*",
+		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 2 ) end
+	},
+
+	maybe = {
+		help = "*TODO*",
+		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 1 ) end
+	},
+
+	no = {
+		help = "*TODO*",
+		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 0 ) end
+	},
+
 	view = {
 		help = "*TODO*"
 	},
@@ -193,6 +209,7 @@ commands = {
 	banUser = {
 		help = "*TODO*"
 	},
+
 	unbanUser = {
 		help = "*TODO*"
 	}
