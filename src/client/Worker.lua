@@ -12,8 +12,12 @@ local discordia = luvitRequire "discordia"
 Logger.d "Compiling Worker"
 local Worker = class "Worker" {
 	static = {
-		GUILD_ID = "158038708057145344",
-		CHANNEL_ID = "361062102732898314"
+		GUILD_ID = "158038708057145344";
+		CHANNEL_ID = "361062102732898314";
+
+		ATTEND_YES_REACTION = "✅";
+		ATTEND_NO_REACTION = "🚫";
+		ATTEND_MAYBE_REACTION = "❔";
 	};
 
 	tokenLocation = ".token";
@@ -71,6 +75,7 @@ function Worker:start()
 	Logger.s "Fetching guild and channel information"
 
 	self.client:on( "messageCreate", function( message ) self.messageManager:handleInbound( message ) end )
+	self.client:on( "reactionAdd", function( ... ) self.messageManager:handleNewReaction( ... ) end)
 	self.alive = true
 	Logger.s "Worker ready -- waiting for messages"
 

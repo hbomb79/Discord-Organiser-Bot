@@ -1,6 +1,9 @@
 local JSONPersist = require "src.helpers.JSONPersist"
 local Reporter = require "src.helpers.Reporter"
 local Logger = require "src.client.Logger"
+local discordia = luvitRequire "discordia"
+
+local wrap = function( f ) return coroutine.wrap( f )() end
 
 local function bulkDelete( channel )
 	local msgs = channel:getMessages()
@@ -17,6 +20,10 @@ end
 
 Logger.d "Compiling EventManager"
 local EventManager = class "EventManager" {
+	static = {
+		ATTEND_ENUM = { [ 0 ] = "not going", [ 1 ] = "might be going", [ 2 ] = "going" }
+	};
+
 	events = {}
 }
 
@@ -148,6 +155,7 @@ function EventManager:unpublishEvent()
 	Logger.i( "Unpublishing currently published event", "Author: " .. name )
 
 	publishedEvent.published = false
+	publishedEvent.pushedSnowflake = nil
 
 	JSONPersist.saveToFile( ".events", self.events )
 	Logger.s( "Unpublished event for " .. name .. " ["..publishedEvent.author.."]" )
@@ -166,16 +174,62 @@ function EventManager:pushEvent( target, userID )
 	Logger.i( "Pushing event to target chat ("..tostring( target )..")" )
 
 	local event = self.events[ userID ]
+	local function formResponses()
+		local lastState, client, responses, str, states = false, self.worker.client, event.responses, "", { {}, {}, {} }
+		for userID, response in pairs( responses ) do table.insert( states[ response + 1 ], userID ) end
+
+		local function out( a ) str = str .. "\n" .. a end
+		for s = 1, #states do
+			local state = states[ s ]
+			if #state > 0 then
+				local name = EventManager.ATTEND_ENUM[ s - 1 ]
+				out( ("__%s%s__"):format( name:sub( 1, 1 ):upper(), name:sub( 2 ) ) )
+
+				for r = 1, #state do
+					out( ("- %s"):format( client:getUser( state[ r ] ).fullname ) )
+				end
+			end
+		end
+
+		return str
+	end
 
 	if target == self.worker.cachedChannel then bulkDelete( target ) end
-	Reporter.info(
-		target, event.title, event.desc,
-		{ name = "Location", value = event.location, inline = true },
-		{ name = "Timeframe", value = event.timeframe, inline = true },
-		{ name = "RSVPs", value = "Literally nobody -- This doesn't work yet." }
-	)
+	local message = target:send {
+		embed = {
+			title = event.title,
+			description = event.desc,
+			fields = {
+				{ name = "Location", value = event.location, inline = true },
+				{ name = "Timeframe", value = event.timeframe, inline = true },
+				{ name = "RSVPs", value = formResponses() }
+			},
+
+			color = discordia.Color.fromRGB( 114, 137, 218 ).value,
+		    timestamp = os.date "!%Y-%m-%dT%H:%M:%S",
+			footer = { text = "Bot written by Hazza Bazza Boo" }
+		}
+	}
+
+	if event.published then
+		Logger.d( "Pushing a published event -- caching event announcement snowflake for use with reaction based RSVPs", "ID: " .. message.id )
+		if event.pushedSnowflake ~= message.id then
+			Logger.d "Updating .events file to hold correct event snowflake under published event"
+			event.pushedSnowflake = message.id
+
+			JSONPersist.saveToFile( ".events", self.events )
+		end
+
+		wrap( function()
+			Logger.d "Adding message reactions for RSVPs"
+			message:addReaction "✅"
+			message:addReaction "❔"
+			message:addReaction "🚫"
+		end )
+	end
 
 	Logger.s "Pushed event to target"
+	return true, message
 end
 
 --[[
@@ -213,7 +267,8 @@ end
 	@desc WIP
 ]]
 function EventManager:updateEvent( userID, field, value )
-	local name = self.worker.client:getUser( userID ).fullname
+	local client = self.worker.client
+	local name = client:getUser( userID ).fullname
 	Logger.i("Attempting to update " .. name .. " event (field '"..tostring( field ) .. "', value '"..tostring( value ).."')")
 
 	local event = self:getEvent( userID )
@@ -224,11 +279,15 @@ function EventManager:updateEvent( userID, field, value )
 		JSONPersist.saveToFile( ".events", self.events )
 
 		if event.published then
-			-- The field has been updated. If the event has been published let all members that have RSVP'd know the event has been updated
+			Logger.i( "Notifying users that have RSVP'd to event that details have changed" )
+			local notif = "<@"..event.author.."> has changed the details of the published event. You are currently set to **%s**.\n\nChange your RSVP state using the reactions under the announcement message in BGnS"
+
 			local rsvps = event.responses
 			for userID, response in pairs( rsvps ) do
-				-- local m = GUILD:getMember( userID )
-				-- log.i( "TODO: Send edit information to user " .. tostring( m ) .. " | userID: " .. tostring( userID ) )
+				local user = client:getUser( userID )
+				Logger.d( "Notifying " .. user.fullname )
+
+				Reporter.info( user, "Event Plans Have Changed", notif:format( EventManager.ATTEND_ENUM[ response ] ) )
 			end
 
 			self:refreshRemote()
@@ -236,6 +295,40 @@ function EventManager:updateEvent( userID, field, value )
 
 		return true
 	end
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
+function EventManager:respondToEvent( userID, state )
+	local user, event = self.worker.client:getUser( userID ), self:getPublishedEvent()
+	local eventAuthor, stateName = self.worker.client:getUser( event.author ), EventManager.ATTEND_ENUM[ state ]
+	Logger.i( "Attempting to set RSVP state for " .. user.fullname .. " on published event (author: "..eventAuthor.fullname..") to state "..tostring( state ), userID )
+
+	if not state or not ( state == 0 or state == 1 or state == 2 ) then
+		return Logger.e( "Failed to RSVP. State '"..tostring( state ).."' is invalid. Can only be 0, 1, or 2 (not going, maybe, going respectively)" )
+	elseif not event then
+		Reporter.warning( user, "Failed to RSVP", "No event is published -- can only RSVP to published events" )
+		return Logger.w "Cannot respond to event -- no event published"
+	elseif event.author == userID then
+		Reporter.warning( user, "Failed to RSVP", "The published event is owned by you! Cannot RSVP to own event." )
+		Logger.w "Cannot respond to event -- cannot respond to own events"
+	elseif event.responses[ userID ] == state then
+		Reporter.warning( user, "Failed to RSVP", "You have already set your state to **" .. stateName .. "**.\n\nYou can change your RSVP state using **!yes**, **!no**, or **!maybe** (or you can use the reactions on the announcement message in BGnS)." )
+		Logger.w( "Refusing to respond to event -- user has already set RSVP state to " .. state )
+	else
+		event.responses[ userID ] = state
+		JSONPersist.saveToFile( ".events", self.events )
+
+		Logger.i( "Notifying event host of new RSVP" )
+		Reporter.info( eventAuthor, "A user has RSVP'd", "<@"..userID.."> has set their RSVP status to **"..stateName.."**" )
+
+		Logger.s( "Set response for event authored by " .. eventAuthor.fullname, userID, "to state " .. state )
+		Reporter.success( user, "RSVP Approved", "Your RSVP state **" .. stateName .. "** has been saved and the event host <@"..event.author.."> has been notified." )
+	end
+
+	self:refreshRemote()
 end
 
 extends "Manager"

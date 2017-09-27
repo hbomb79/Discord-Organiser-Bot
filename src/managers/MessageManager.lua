@@ -2,7 +2,10 @@ local Logger = require "src.client.Logger"
 local Manager = require "src.managers.manager"
 local Class = require "src.lib.class"
 local Reporter = require "src.helpers.Reporter"
+local Worker = require "src.client.Worker"
 local discordia = luvitRequire "discordia"
+
+local wrap = function( f ) return coroutine.wrap( f )() end
 
 -- Compile CommandHandler so we can mixin later
 require "src.client.CommandHandler"
@@ -28,6 +31,14 @@ end
 
 Logger.d "Compiling MessageManager"
 local MessageManager = class "MessageManager" {
+	static = {
+		REACTION_ENUM = {
+			[ Worker.ATTEND_YES_REACTION ] = 2;
+			[ Worker.ATTEND_MAYBE_REACTION ] = 1;
+			[ Worker.ATTEND_NO_REACTION ] = 0;
+		};
+	};
+
 	owner = false;
 	queue = {};
 	userRequests = {};
@@ -68,6 +79,23 @@ function MessageManager:handleInbound( message )
 	self:addToQueue( message )
 
 	return true
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
+function MessageManager:handleNewReaction( reaction, userID )
+	if self.worker.client:getUser( userID ).bot then return end
+	local events, message = self.worker.eventManager, reaction.message
+
+	local event = events:getPublishedEvent()
+	if not event or not event.pushedSnowflake or event.pushedSnowflake ~= message.id then
+		return Logger.w "Reaction was added to invalid target. Ensure an event is published and pushed to allow reaction-based RSVPs"
+	end
+
+	events:respondToEvent( userID, MessageManager.REACTION_ENUM[ reaction.emojiName ] )
+	Logger.s "Handled reaction"
 end
 
 --[[
