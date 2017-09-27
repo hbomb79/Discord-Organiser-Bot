@@ -33,6 +33,7 @@ function RestrictionManager:banUser( userID )
 	JSONPersist.saveToFile( ".banned", self.bannedUsers )
 
 	Logger.s( "Banned user " .. self.worker.client:getUser( userID ).fullname, userID )
+	return true
 end
 
 --[[

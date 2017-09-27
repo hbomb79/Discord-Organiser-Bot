@@ -1,9 +1,22 @@
 local Logger = require "src.client.Logger"
 local Reporter = require "src.helpers.Reporter"
+local Worker = require "src.client.Worker"
 
 --[[
 	WIP
 ]]
+
+local function getAdminLevel( worker, userID )
+	local member = worker.cachedGuild:getMember( userID )
+	local admins = Worker.ADMIN_ROLE_IDS
+	for i = 1, #admins do
+		if member:hasRole( admins[ i ] ) then
+			return i
+		end
+	end
+
+	return false
+end
 
 Logger.d "Building commands list (commands.lua)"
 -- format: command = { help = "help desc", admin = true|false, action = function };
@@ -207,11 +220,45 @@ commands = {
 	},
 
 	banUser = {
-		help = "*TODO*"
+		help = "*TODO*",
+		action = function( worker, message, banTargetID )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+
+			local banTarget = worker.client:getUser( banTargetID )
+			if not banTarget then
+				Logger.w( "Failed to perform ban. User: " .. banTargetID, "Is not valid" )
+				return Reporter.warning( user, "Failed to ban", "The provided userID **"..banTargetID.."** is invalid. Please provide a valid userID" )
+			end
+
+			Logger.i( "User " .. user.fullname .. " is attempting to ban user " .. banTarget.fullname )
+			local issuerAdminLevel, targetAdminLevel = getAdminLevel( worker, userID ), getAdminLevel( worker, banTargetID )
+			if not issuerAdminLevel then
+				-- Issuer is not admin
+				Logger.w( "Refusing to perform admin command! User " .. user.fullname .. " is not a BGnS administrator")
+				Reporter.warning( user, "Cannot ban user", "Your account is not an administrator on the BGnS server. You are not permitted to execute admin commands." )
+			elseif targetAdminLevel and issuerAdminLevel > targetAdminLevel then
+				-- Target has a higher rank than issuer
+				Logger.w( "Refusing to ban user. User " .. banTarget.fullname .. " is a higher rank than the command issuer" )
+				Reporter.warning( user, "Refusing to ban user", "Your account is a lower administrator level than the ban target." )
+			else
+				Logger.s( "Issuer of command is within rights to ban" )
+				if worker.messageManager.restrictionManager:banUser( banTarget.id ) then
+					Logger.s( "Banned user " .. banTarget.fullname )
+					Reporter.success( user, "Banned user", "User " .. banTarget.fullname .. " has been banned. Future interactions initiated by this user will be ignored.\n\nThe user has been notified." )
+					Reporter.failure( banTarget, "You have been banned", "A BGnS administrator has banned you from interacting with this bot. Contact <@"..userID.."> if you believe this is in error" )
+				else
+					Reporter.failure( user, "Failed to ban user", "Unknown error occurred. Please try again later" )
+				end
+			end
+		end
 	},
 
 	unbanUser = {
-		help = "*TODO*"
+		help = "*TODO*",
+		action = function( worker, message )
+
+		end
 	}
 }
 
