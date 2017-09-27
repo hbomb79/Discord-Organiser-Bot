@@ -19,7 +19,7 @@ function JSONPersist.static.loadFromFile( path )
 	local c = h:read "*a"
 	h:close()
 
-	return Logger.assert( json.decode( c ), "Failed to decode content", "Decoded content JSON -> Lua [table]" )
+	return json.decode( c )
 end
 
 --[[
@@ -30,7 +30,7 @@ function JSONPersist.static.saveToFile( path, table )
 	Logger.i("Saving table " .. tostring( table ) .. " to path '"..tostring( path ).."'")
 
 	local h = io.open( path, "w+" )
-	h:write( Logger.assert( json.encode( table ), "Failed to encode " .. tostring( table ) .. " to JSON", "Successfully encoded to JSON" ) )
+	h:write( json.encode( table ) )
 	h:close()
 end
 
