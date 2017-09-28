@@ -229,6 +229,9 @@ commands = {
 			if not banTarget then
 				Logger.w( "Failed to perform ban. User: " .. banTargetID, "Is not valid" )
 				return Reporter.warning( user, "Failed to ban", "The provided userID **"..banTargetID.."** is invalid. Please provide a valid userID" )
+			elseif worker.messageManager.restrictionManager.bannedUsers[ banTargetID ] then
+				Logger.w( "Failed to perform ban. User " .. banTarget.fullname, banTargetID .. " is already banned" )
+				return Reporter.warning( user, "Failed to ban", "User " .. banTarget.fullname .. " already banned. Use **!unbanUser " .. banTarget .. "** to unban user" )
 			end
 
 			Logger.i( "User " .. user.fullname .. " is attempting to ban user " .. banTarget.fullname )
