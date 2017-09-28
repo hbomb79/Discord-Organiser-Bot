@@ -13,7 +13,7 @@
 
     Notable differences between Titanium class system and this edition:
         - Support for TML has been removed
-        - Class global renamed from 'Titanium' to 'Class'
+        - Class global REMOVED -- the class library is now returned from this file (require this file)
         - Classes are no longer exported into the global space and must be required manually (*)
         - Support for constructor property type 'colour' and 'color' has been removed entirely
 
