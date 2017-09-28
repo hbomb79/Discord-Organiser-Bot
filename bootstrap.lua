@@ -1,33 +1,36 @@
 --[[
-	Bootstrap the discord bot by:
-		- starting the client
-		- connecting to the guild
-		- retrieving channel information
-		- loading event information
-		- running the client with token
+	Bootstrap the Discord bot by loading the OOP class system, Discordia, and
+	creating (and starting) a new instance of Worker.
+
+	This program uses a modified version of the Titanium class system (Copyright (c) Harry Felton).
+	See src/lib/class.lua for more information regarding licensing.
+
+	Copyright (c) Harry Felton 2017
 ]]
 
--- Require Discordia and fetch the client instance.
+print "Starting bootstrap process"
 
-local discordia, worker, log, json = require "discordia", require "helpers.worker", require "helpers.logger", require "json"
+-- Luvit's 'require' breaks down after I require a file (ie: when a require a file, that file uses Vanilla Lua's require instead
+-- of luvit's -- this means that files end up being executed more than once!). This block of code essentially means that this file
+-- uses Lua's vanilla `require` instead of luvits to avoid issues with files being loaded more than once.
+_G.luvitRequire = require;
+local require = _G.require
 
-CLIENT = discordia.Client()
+-- Require and store Discordia (currently here for debug purposes)
+local discordia = luvitRequire "discordia"
+assert( discordia, "Failed to bootstrap: Discordia failed to load" )
 
--- Bind the event listeners so we can respond to the creation, update, deletion of messages
-CLIENT:on( "messageCreate", function( message )
-	worker:addToQueue( message )
-end )
+-- Store the class API in the 'Class' global
+Class = require "src.lib.class"
+assert( type( class ) == "function" and type( Class ) == "table" and abstract and mixin and extends, "Failed to bootstrap: Class library references could not be found" )
 
-CLIENT:once( "ready", function()
-	log.i "Client started, initialising worker"
-	worker:init( CLIENT, json, discordia )
-end )
+local Logger = require "src.client.Logger"
 
--- Run the client
-log.i "Starting client"
-local h = io.open("./.token")
-if not log:assert( h, "Unable to open .token file -- Not found or unable to read (in use/invalid permission/etc)" ) then return end
-local token = h:read "*a"
-h:close()
+-- Instantiate a Worker
+local ok, err = pcall( require "src.client.Worker" )
+if not ok then
+	Logger.f( "Worker instance failed", tostring( err ) )
+	return false
+end
 
-CLIENT:run( token )
+Logger.s "Finished bootstrap -- Control given to worker"

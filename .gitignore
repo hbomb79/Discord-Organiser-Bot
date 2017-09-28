@@ -1,4 +1,6 @@
 .token
-banned.cfg
-events.cfg
+discordia.log
+.banned
+.events
 gateway.json
+old/
