@@ -21,5 +21,5 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-* The above license also applies to the Titanium class engine used in this bot,
-but taken from hbomb79/Titanium *
+*The above license also applies to the Titanium class engine used in this bot,
+but taken from hbomb79/Titanium*
