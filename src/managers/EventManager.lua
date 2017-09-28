@@ -202,7 +202,7 @@ function EventManager:pushEvent( target, userID )
 			fields = {
 				{ name = "Location", value = event.location, inline = true },
 				{ name = "Timeframe", value = event.timeframe, inline = true },
-				{ name = "RSVPs", value = formResponses() }
+				{ name = "RSVPs (use the reactions underneath)", value = formResponses() }
 			},
 
 			color = discordia.Color.fromRGB( 114, 137, 218 ).value,
