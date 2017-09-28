@@ -86,7 +86,7 @@ end
 	@desc WIP
 ]]
 function MessageManager:handleNewReaction( reaction, userID )
-	if self.worker.client:getUser( userID ).bot then return end
+	if self.worker.client:getUser( userID ).bot or self.restrictionManager:isUserBanned( userID ) then return end
 	local events, message = self.worker.eventManager, reaction.message
 
 	local event = events:getPublishedEvent()
