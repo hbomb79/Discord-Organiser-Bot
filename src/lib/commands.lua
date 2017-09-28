@@ -240,6 +240,9 @@ commands = {
 				-- Issuer is not admin
 				Logger.w( "Refusing to perform admin command! User " .. user.fullname .. " is not a BGnS administrator")
 				Reporter.warning( user, "Cannot ban user", "Your account is not an administrator on the BGnS server. You are not permitted to execute admin commands." )
+			elseif banTargetID == userID then
+				Logger.e( "User " .. user.fullname .. " tried to ban themselves. Rejecting request" )
+				return Reporter.failure( user, "Failed to ban", "You cannot ban yourself, silly!" )
 			elseif targetAdminLevel and issuerAdminLevel > targetAdminLevel then
 				-- Target has a higher rank than issuer
 				Logger.w( "Refusing to ban user. User " .. banTarget.fullname .. " is a higher rank than the command issuer" )
