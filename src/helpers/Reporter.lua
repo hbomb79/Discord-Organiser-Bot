@@ -23,11 +23,11 @@ local Reporter = class "Reporter" {
 
 function Reporter.static.send( target, colour, title, description, ... )
 	local f = { ... }
-	if discordia.class.type( target ) == "User" then
-		if Logger.worker and Logger.worker.messageManager.restrictionManager:isUserRestricted( target.id, true ) then
-			return Logger.w( "Refusing to send message '"..title.."' to user " .. target.fullname, "User is banned or restricted" )
-		end
-	end
+	-- if discordia.class.type( target ) == "User" then
+	-- 	if Logger.worker and Logger.worker.messageManager.restrictionManager:isUserRestricted( target.id, true ) then
+	-- 		return Logger.w( "Refusing to send message '"..title.."' to user " .. target.fullname, "User is banned or restricted" )
+	-- 	end
+	-- end
 
 	coroutine.wrap( function()
 		target:send {

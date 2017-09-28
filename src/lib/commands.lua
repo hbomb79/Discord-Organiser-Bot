@@ -256,8 +256,35 @@ commands = {
 
 	unbanUser = {
 		help = "*TODO*",
-		action = function( worker, message )
+		action = function( worker, message, unbanTargetID )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
 
+			local banTarget = worker.client:getUser( unbanTargetID )
+			if not banTarget then
+				Logger.w( "Failed to perform unban. User: " .. unbanTargetID, "Is not valid" )
+				return Reporter.warning( user, "Failed to unban", "The provided userID **"..unbanTargetID.."** is invalid. Please provide a valid userID" )
+			elseif not worker.messageManager.restrictionManager.bannedUsers[ unbanTargetID ] then
+				Logger.w( "Failed to lift user ban on " .. banTarget.fullname, "User is not banned" )
+				return Reporter.warning( user, "Failed to lift ban", banTarget.fullname .. " is not banned" )
+			end
+
+			Logger.i( "User " .. user.fullname .. " is attempting to lift ban on user " .. banTarget.fullname )
+			local issuerAdminLevel = getAdminLevel( worker, userID )
+			if not issuerAdminLevel then
+				-- Issuer is not admin
+				Logger.w( "Refusing to perform admin command! User " .. user.fullname .. " is not a BGnS administrator")
+				Reporter.warning( user, "Cannot unban user", "Your account is not an administrator on the BGnS server. You are not permitted to execute admin commands." )
+			else
+				Logger.s( "Issuer of command is within rights to lift ban" )
+				if worker.messageManager.restrictionManager:unbanUser( banTarget.id ) then
+					Logger.s( "Banned user " .. banTarget.fullname )
+					Reporter.success( user, "Lifted user ban", "User " .. banTarget.fullname .. " has been unbanned. \n\nThe user has been notified." )
+					Reporter.success( banTarget, "You have been un-banned", "A BGnS administrator has explicitly lifted your ban. You are now free to interact with this bot (within reason -- spam will automatically trigger a permanent suspension)." )
+				else
+					Reporter.failure( user, "Failed to lift user ban", "Unknown error occurred. Please try again later" )
+				end
+			end
 		end
 	}
 }

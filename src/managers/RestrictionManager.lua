@@ -40,6 +40,22 @@ end
 	@instance
 	@desc
 ]]
+function RestrictionManager:unbanUser( userID )
+	if not self.bannedUsers[ userID ] then
+		return Logger.e( "Refusing to lift ban on user " .. userID, "The user is not banned" )
+	end
+
+	self.bannedUsers[ userID ] = nil
+	JSONPersist.saveToFile( ".banned", self.bannedUsers )
+
+	Logger.s( "Lifted ban on user " .. self.worker.client:getUser( userID ).fullname, userID )
+	return true
+end
+
+--[[
+	@instance
+	@desc
+]]
 function RestrictionManager:isUserBanned( userID )
 	return self.bannedUsers[ userID ]
 end
