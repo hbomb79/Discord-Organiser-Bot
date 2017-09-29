@@ -25,7 +25,7 @@ commands = {
 						if commands[ com ] then
 							local h = commands[ com ].help
 							Logger.d( "Serving help for cmd " .. com )
-							fields[ #fields + 1 ] = { name = "!"..com, value = #h == 0 and "**HELP UNAVAILABLE**" or h }
+							fields[ #fields + 1 ] = { name = "!"..com .. ( commands[ com ].admin and " \\*ADMIN*" or "" ), value = #h == 0 and "**HELP UNAVAILABLE**" or h }
 						else
 							Logger.w( "Help information not available for "..com )
 							invalidFields[ #invalidFields + 1 ] = com
@@ -46,7 +46,7 @@ commands = {
 				else
 					local fields = {}
 					for name, config in pairs( commands ) do
-						fields[ #fields + 1 ] = { name = "!" .. name, value = #config.help == 0 and "**HELP UAVAILABLE**" or config.help }
+						fields[ #fields + 1 ] = { name = "!" .. name .. ( config.admin and " \\*ADMIN*" or "" ), value = #config.help == 0 and "**HELP UAVAILABLE**" or config.help }
 					end
 
 					Reporter.info( message.author, "Command Help", "Below is a list of help information for each of the commands you can use. " .. tostring( #fields ), unpack( fields ) )
