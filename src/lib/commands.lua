@@ -252,7 +252,7 @@ commands = {
 	},
 
 	setPollDesc = {
-		help = "*TODO*",
+		help = "Set's the description of the poll attached to the users event",
 		action = function( worker, message, desc )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -277,7 +277,7 @@ commands = {
 	},
 
 	addPollOption = {
-		help = "*TODO*",
+		help = "Adds a poll option the poll attached to the users event",
 		action = function( worker, message, choice )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -308,7 +308,7 @@ commands = {
 	},
 
 	listPollOptions = {
-		help = "*TODO*",
+		help = "Lists the poll options for the poll attached to the users event",
 		action = function( worker, message )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -337,7 +337,7 @@ commands = {
 	},
 
 	removePollOption = {
-		help = "*TODO*",
+		help = "Removes the poll option at the index provided: **!removePollOption [index]**\n\nIf index is nil (not provided or invalid number) then a list of poll options is shown and the user is asked which option to remove",
 		action = function( worker, message, index )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -380,7 +380,7 @@ commands = {
 	},
 
 	deletePoll = {
-		help = "*TODO*",
+		help = "Remove the poll attached to your event. If the event is published the remote is refreshed",
 		action = function( worker, message )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -404,26 +404,26 @@ commands = {
 	},
 
 	yes = {
-		help = "*TODO*",
+		help = "Tell the host of the published event that you *are attending*",
 		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 2 ) end
 	},
 
 	maybe = {
-		help = "*TODO*",
+		help = "Tell the host of the published event that you *might be attending*",
 		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 1 ) end
 	},
 
 	no = {
-		help = "*TODO*",
+		help = "Tell the host of the published event that you *not attending*",
 		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 0 ) end
 	},
 
 	view = {
-		help = "*TODO*"
+		help = "NYI"
 	},
 
 	banUser = {
-		help = "*TODO*",
+		help = "Ban the userID provided from interacting with the bot. Command must be provided with a resolvable userID (member of cached guild)\n\nThe user will be notified",
 		admin = true,
 		action = function( worker, message, banTargetID )
 			local user, events = message.author, worker.eventManager
@@ -461,7 +461,7 @@ commands = {
 	},
 
 	unbanUser = {
-		help = "*TODO*",
+		help = "Lifts a ban on the userID provided. Command must be provided with a resolvable userID (member of cached guild)\n\nThe user will be notified",
 		admin = true,
 		action = function( worker, message, unbanTargetID )
 			local user, events = message.author, worker.eventManager
