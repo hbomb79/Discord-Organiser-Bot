@@ -79,6 +79,8 @@ commands = {
 			if worker.eventManager:createEvent( userID ) then
 				Logger.i("Created new event -- notifying user")
 				Reporter.success( user, "Created event", "Your event has been successfully created.\n\nCustomize it using any of: !setTitle, !setLocation, !setTimeframe, !setDesc (for each 'set' command their is a 'get' version too)!\n\n*Happy hosting!*")
+
+				worker.messageManager.promptModes[ userID ] = CommandHandler.PROMPT_MODE_ENUM.CREATE_TITLE
 			else
 				Logger.w("Failed to create new event -- notifying user")
 				Reporter.warning( user, "Failed to create new event", "Please try again later." )
