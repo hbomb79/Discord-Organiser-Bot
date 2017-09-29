@@ -233,7 +233,7 @@ commands = {
 			end
 
 			Logger.i( "User " .. user.fullname .. " is attempting to ban user " .. banTarget.fullname )
-			local issuerAdminLevel, targetAdminLevel = worker:getAdminLevel( worker, userID ), worker:getAdminLevel( worker, banTargetID )
+			local issuerAdminLevel, targetAdminLevel = worker:getAdminLevel( userID ), worker:getAdminLevel( banTargetID )
 			if banTargetID == userID then
 				Logger.e( "User " .. user.fullname .. " tried to ban themselves. Rejecting request" )
 				return Reporter.failure( user, "Failed to ban", "You cannot ban yourself, silly!" )
