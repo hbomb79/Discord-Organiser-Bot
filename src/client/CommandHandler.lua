@@ -82,7 +82,6 @@ function CommandHandler:handlePromptResponse( message, response )
 	elseif mode == MODES.POLL_CHOICE_ADD then
 		tryExe( nil, "addPollOption" )
 	elseif mode == MODES.POLL_REMOVE then
-		-- TODO
 		tryExe( nil, "removePollOption" )
 	end
 end

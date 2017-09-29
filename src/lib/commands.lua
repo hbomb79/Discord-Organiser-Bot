@@ -197,6 +197,33 @@ commands = {
 		action = function( worker, message ) worker.eventManager:refreshRemote(); Reporter.success( message.author, "Remote refreshed", "The BGnS server has been refreshed to show most recent information" ) end
 	},
 
+	revokeRemote = {
+		help = "Forces the bot to unpublish the currently published event. The event host will be notified. It is suggested that troublesome users be banned using **!banUser**.",
+		admin = true,
+		action = function( worker, message )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " is attempting to revoke remote." )
+
+			local ev = events:getPublishedEvent()
+			if not ev then
+				Logger.w( "Unable to revoke remote. No event is currently pushed." )
+				Reporter.failure( user, "Failed to revoke remote", "No event is currently published so no event can be revoked." )
+			end
+
+			local issuerLevel, authorLevel = worker:getAdminLevel( userID ), worker:getAdminLevel( ev.author )
+			if ev.author == userID or ( not authorLevel or authorLevel > issuerLevel ) then
+				Logger.s( "User is within their rights to revoke event" )
+				events:unpublishEvent()
+
+				Reporter.success( user, "Event revoked", "The published event has been revoked -- the event host will be notified" )
+				Reporter.failure( worker.client:getUser( ev.author ), "Your event has been revoked", "Your event has been forcefully revoked from the BGnS server. If you believe this is in error, or wish to learn more about why this decision was made, contact <@"..userID..">" )
+
+				return true
+			end
+		end
+	},
+
 	createPoll = {
 		help = "Creates a poll on the current event",
 		action = function( worker, message )
@@ -272,7 +299,7 @@ commands = {
 					return true
 				else
 					Logger.e( "Failed to edit poll for " .. user.fullname, userID )
-					return Reporter.failure( user, "Failed to edit poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report")
+					return Reporter.failure( user, "Failed to edit poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report" )
 				end
 			end
 		end
@@ -292,6 +319,36 @@ commands = {
 			elseif not ev.poll then
 				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no poll" )
 				return Reporter.warning( user, "Failed to view poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			else
+				local choices, str = ev.poll.choices, ""
+				if #choices == 0 then
+					Reporter.info( user, "Poll Options", "No options. Add one by using **!addPollOption**.\n\nYour poll won't display on the BGnS server until it has options attached to it" )
+				else
+					for i = 1, #choices do
+						str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+					end
+
+					Reporter.info( user, "Poll Options", str )
+				end
+			end
+		end
+	},
+
+	removePollOption = {
+		help = "*TODO*",
+		action = function( worker, message, index )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to remove poll choice" )
+
+			index = tonumber( index )
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
 			else
 				local choices, str = ev.poll.choices, ""
 				if #choices == 0 then
@@ -320,40 +377,27 @@ commands = {
 		end
 	},
 
-	removePollOption = {
-		help = "*TODO*",
-		action = function( worker, message, index )
-			local user, events = message.author, worker.eventManager
-			local userID = user.id
-			Logger.i( "User " .. user.fullname .. " attempting to remove poll choice" )
-
-			index = tonumber( index )
-			local ev = events:getEvent( userID )
-			if not ev then
-				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no event" )
-				return Reporter.warning( user, "Failed to view poll", "You don't own an event. Create an event using **!create** before editing a poll" )
-			elseif not ev.poll then
-				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no poll" )
-				return Reporter.warning( user, "Failed to view poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
-			else
-				local choices, str = ev.poll.choices, ""
-				if #choices == 0 then
-					Reporter.info( user, "Poll Options", "No options. Add one by using **!addPollOption**.\n\nYour poll won't display on the BGnS server until it has options attached to it" )
-				else
-					for i = 1, #choices do
-						str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
-					end
-
-					Reporter.info( user, "Poll Options", str )
-				end
-			end
-		end
-	},
-
 	deletePoll = {
 		help = "*TODO*",
 		action = function( worker, message )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " is attempting to delete poll" )
 
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot delete poll. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to delete poll", "You don't own an event." )
+			elseif not ev.poll then
+				Logger.w( "Cannot delete poll. User " .. user.fullname, userID .. " has no poll attached to their event" )
+				return Reporter.warning( user, "Failed to delete poll", "You don't have a poll." )
+			else
+				if events:deletePoll( userID ) then
+					Reporter.success( user, "Deleted poll", "Your poll has been deleted." .. ( ev.published and " It has been revoked from the remote server (BGnS server) and can no longer be voted on" or "" ) )
+				else
+					Reporter.failure( user, "Cannot delete poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report" )
+				end
+			end
 		end
 	},
 
