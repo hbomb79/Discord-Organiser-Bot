@@ -80,7 +80,7 @@ commands = {
 				Logger.i("Created new event -- notifying user")
 				Reporter.success( user, "Created event", "Your event has been successfully created.\n\nCustomize it using any of: !setTitle, !setLocation, !setTimeframe, !setDesc (for each 'set' command their is a 'get' version too)!\n\n*Happy hosting!*")
 
-				worker.messageManager.promptModes[ userID ] = CommandHandler.PROMPT_MODE_ENUM.CREATE_TITLE
+				worker.messageManager:setPromptMode( userID, CommandHandler.PROMPT_MODE_ENUM.CREATE_TITLE )
 			else
 				Logger.w("Failed to create new event -- notifying user")
 				Reporter.warning( user, "Failed to create new event", "Please try again later." )
@@ -261,9 +261,15 @@ commands = {
 			elseif not ev.poll then
 				Logger.w( "Cannot edit poll choices. User " .. user.fullname, userID .. " has no poll" )
 				return Reporter.warning( user, "Failed to edit poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			elseif #ev.poll.choices >= 10 then
+				Logger.w( "Refusing to edit poll choices. User " .. user.fullname, userID .. " already has 10 options saved." )
+				return Reporter.failure( user, "Failed to edit poll", "You have reached the maximum amount of poll choices (10). Remove some options using **!removePollOption**")
+			elseif not ( choice and choice:find "%w" ) then
+				worker.messageManager:setPromptMode( userID, CommandHandler.PROMPT_MODE_ENUM.POLL_CHOICE_ADD )
 			else
 				if events:addPollOption( userID, choice ) then
-					return Reporter.success( user, "Edited poll", "Your new option has been added to your poll at position " .. #ev.poll.choices .. ". Use **!removePollOption " .. #ev.poll.choices .. "** to remove this choice, or **!listPollOptions** to see all choices" )
+					Reporter.success( user, "Edited poll", "Your new option has been added to your poll at position " .. #ev.poll.choices .. ". Use **!removePollOption " .. #ev.poll.choices .. "** to remove this choice, or **!listPollOptions** to see all choices" )
+					return true
 				else
 					Logger.e( "Failed to edit poll for " .. user.fullname, userID )
 					return Reporter.failure( user, "Failed to edit poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report")
@@ -288,8 +294,27 @@ commands = {
 				return Reporter.warning( user, "Failed to view poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
 			else
 				local choices, str = ev.poll.choices, ""
-				for i = 1, #choices do
-					str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+				if #choices == 0 then
+					return Reporter.warning( user, "Cannot remove option", "You have no options stored on you poll. Add them using **!addPollOption**" )
+				elseif not index then
+					Logger.i( "Command was not issued with a target option. Displaying options for removal." )
+					for i = 1, #choices do
+						str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+					end
+
+					Reporter.info( user, "Poll Options", str )
+					if worker.messageManager.promptModes[ userID ] == CommandHandler.PROMPT_MODE_ENUM.POLL_REMOVE then
+						Reporter.failure( user, "Invalid index", "The index provided is invalid. Please retry with a valid index (a integer that corresponds to an option in the list)" )
+					else
+						worker.messageManager:setPromptMode( userID, CommandHandler.PROMPT_MODE_ENUM.POLL_REMOVE )
+					end
+				else
+					if events:removePollOption( userID, index ) then
+						Reporter.success( user, "Removed poll option", "We removed that option for you. Use **!listPollOptions** to see the remaining options for your poll" )
+						return true
+					else
+						Reporter.failure( user, "Failed to remove poll option", "An unkown error occured. Ensure that a poll option at index '"..index.."' exists before retrying" )
+					end
 				end
 			end
 		end
@@ -302,10 +327,7 @@ commands = {
 			local userID = user.id
 			Logger.i( "User " .. user.fullname .. " attempting to remove poll choice" )
 
-			if not index then
-				Logger.i( "Command was not issued with a target option. Displaying options for removal." )
-			end
-
+			index = tonumber( index )
 			local ev = events:getEvent( userID )
 			if not ev then
 				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no event" )
@@ -315,8 +337,14 @@ commands = {
 				return Reporter.warning( user, "Failed to view poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
 			else
 				local choices, str = ev.poll.choices, ""
-				for i = 1, #choices do
-					str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+				if #choices == 0 then
+					Reporter.info( user, "Poll Options", "No options. Add one by using **!addPollOption**.\n\nYour poll won't display on the BGnS server until it has options attached to it" )
+				else
+					for i = 1, #choices do
+						str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+					end
+
+					Reporter.info( user, "Poll Options", str )
 				end
 			end
 		end

@@ -411,7 +411,7 @@ function EventManager:addPollOption( userID, option )
 		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has no event" )
 	elseif not event.poll then
 		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has no poll" )
-	elseif #event.poll.choices > 10 then
+	elseif #event.poll.choices >= 10 then
 		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has reached the choice limit (10)" )
 	else
 		table.insert( event.poll.choices, option )
@@ -441,10 +441,10 @@ function EventManager:removePollOption( userID, index )
 	elseif not event.poll.choices[ index ] then
 		return Logger.e( "Failed to remove poll option. There is no poll option #" .. index .. " in users event " .. user.fullname, userID )
 	else
-		table.remove( event.poll.choices, index )
+		local val = table.remove( event.poll.choices, index )
 
 		JSONPersist.saveToFile( ".events", self.events )
-		Logger.s( "Removed poll option "..index.." for " .. user.fullname )
+		Logger.s( "Removed poll option '"..val.."' ("..index..") for " .. user.fullname )
 
 		return true
 	end

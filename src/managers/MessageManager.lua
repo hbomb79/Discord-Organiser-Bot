@@ -8,7 +8,7 @@ local discordia = luvitRequire "discordia"
 local wrap = function( f ) return coroutine.wrap( f )() end
 
 -- Compile CommandHandler so we can mixin later
-require "src.client.CommandHandler"
+local CommandHandler = require "src.client.CommandHandler"
 
 local function checkMutalGuild( author )
 	local targetGuild = Class.getClass "Worker".static.GUILD_ID
@@ -80,6 +80,22 @@ function MessageManager:handleInbound( message )
 	self:addToQueue( message )
 
 	return true
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
+function MessageManager:setPromptMode( userID, mode )
+	local user = self.worker.client:getUser( userID )
+	if not user then
+		return Logger.w("Failed to set prompt mode for user " .. userID .. ". User ID invalid.")
+	end
+
+	self.promptModes[ userID ] = mode
+	user:send( mode and CommandHandler.PROMPT_MODE_HELP[ mode ] .. " -- __or__ use **!skip** to move on, or use **!skipall** to leave prompt mode" or "**Prompt mode exited** -- commands can be entered normally." )
+
+	Logger.s( "Notified " .. user.fullname .. " that they are " .. ( mode and "in prompt mode" or "no longer in prompt mode" ), select( 2, pcall( error, "hit", 4 ) ) )
 end
 
 --[[

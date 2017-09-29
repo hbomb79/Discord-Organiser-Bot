@@ -25,8 +25,19 @@ local CommandHandler = class "CommandHandler" {
 			CREATE_LOCATION = 3;
 			CREATE_TIMEFRAME = 4;
 
-			POLL_REMOVE = 5;
+			POLL_CHOICE_ADD = 5;
+			POLL_REMOVE = 6;
 		};
+
+		PROMPT_MODE_HELP = {
+			"**Enter your event's title now**", -- CREATE_TITLE
+			"**Enter your event's description now**", -- CREATE_DESC
+			"**Enter your event's location now**", -- CREATE_LOCATION
+			"**Enter your event's timeframe now**", -- CREATE_TIMEFRAME
+
+			"**Enter the name of your new poll option now**", -- POLL_CHOICE_ADD
+			"**Enter the number next to the poll option you want to remove**", -- POLL_REMOVE
+		}
 	};
 }
 
@@ -47,14 +58,13 @@ function CommandHandler:handlePromptResponse( message, response )
 	local user = message.author
 	local userID = user.id
 
-	local function tryExe( target, ... )
-		if response:find "^%!cancel" then
-			self.promptModes[ userID ] = nil
-			Reporter.success( user, "Successfully cancelled input", "Canceled prompt input -- ready for direct commands" )
-
-			return
+	local function tryExe( target, command, ... )
+		if response:find "^%!skipall" then
+			self:setPromptMode( userID )
+		elseif response:find "^%!skip" then
+			self:setPromptMode( userID, target )
 		else
-			if self:executeCommand( ... ) then self.promptModes[ userID ] = target end
+			if self:executeCommand( command, message, response, ... ) then self:setPromptMode( userID, target ) else self:setPromptMode( userID, self.promptModes[ userID ] ) end
 		end
 	end
 
@@ -62,15 +72,18 @@ function CommandHandler:handlePromptResponse( message, response )
 	if not mode then
 		return Logger.e( "Failed to handle prompt response from " .. user.fullname, userID .. " no prompt mode set for this user. Should probably be handled as a direct command" )
 	elseif mode == MODES.CREATE_TITLE then
-		tryExe( MODES.CREATE_DESC, "setTitle", message, response )
+		tryExe( MODES.CREATE_DESC, "setTitle" )
 	elseif mode == MODES.CREATE_DESC then
-		tryExe( MODES.CREATE_LOCATION, "setDesc", message, response )
+		tryExe( MODES.CREATE_LOCATION, "setDesc" )
 	elseif mode == MODES.CREATE_LOCATION then
-		tryExe( MODES.CREATE_TIMEFRAME, "setLocation", message, response )
+		tryExe( MODES.CREATE_TIMEFRAME, "setLocation" )
 	elseif mode == MODES.CREATE_TIMEFRAME then
-		tryExe( nil, "setTimeframe", message, response )
+		tryExe( nil, "setTimeframe" )
+	elseif mode == MODES.POLL_CHOICE_ADD then
+		tryExe( nil, "addPollOption" )
 	elseif mode == MODES.POLL_REMOVE then
 		-- TODO
+		tryExe( nil, "removePollOption" )
 	end
 end
 
