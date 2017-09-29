@@ -337,5 +337,119 @@ function EventManager:respondToEvent( userID, state )
 	self:refreshRemote()
 end
 
+--[[
+	@instance
+	@desc WIP
+]]
+function EventManager:createPoll( userID )
+	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
+	if not event then
+		return Logger.e( "Failed to create poll. User " .. user.fullname, userID .. " has no event" )
+	elseif event.poll then
+		return Logger.e( "Refusing to create poll. User " .. user.fullname, userID .. " already has a poll" )
+	else
+		event.poll = {
+			responses = {},
+			choices = {},
+			desc = "There is no description for this poll yet!"
+		}
+
+		JSONPersist.saveToFile( ".events", self.events )
+		Logger.s( "Created poll for " .. user.fullname )
+
+		return true
+	end
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
+function EventManager:deletePoll( userID )
+	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
+	if not event then
+		return Logger.e( "Failed to delete poll. User " .. user.fullname, userID .. " has no event" )
+	elseif not event.poll then
+		return Logger.e( "Refusing to delete poll. User " .. user.fullname, userID .. " has no polls" )
+	else
+		event.poll = nil
+
+		JSONPersist.saveToFile( ".events", self.events )
+		Logger.s( "Deleted poll for " .. user.fullname )
+
+		return true
+	end
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
+function EventManager:setPollDesc( userID, desc )
+	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
+	if not event then
+		return Logger.e( "Failed to edit poll description. User " .. user.fullname, userID .. " has no event" )
+	elseif not event.poll then
+		return Logger.e( "Failed to edit poll. User " .. user.fullname, userID .. " has no poll" )
+	else
+		event.poll.desc = desc
+
+		JSONPersist.saveToFile( ".events", self.events )
+		Logger.s( "Edited poll desc for " .. user.fullname )
+
+		return true
+	end
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
+function EventManager:addPollOption( userID, option )
+	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
+	if not event then
+		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has no event" )
+	elseif not event.poll then
+		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has no poll" )
+	elseif #event.poll.choices > 10 then
+		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has reached the choice limit (10)" )
+	else
+		table.insert( event.poll.choices, option )
+
+		JSONPersist.saveToFile( ".events", self.events )
+		Logger.s( "Added poll option for " .. user.fullname )
+
+		return true, #event.poll.choices
+	end
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
+function EventManager:removePollOption( userID, index )
+	index = tonumber( index )
+	if not index then
+		return Logger.e( "Failed to remove poll option. Index provided '" .. index .. "' is invalid. Provide a valid number" )
+	end
+
+	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
+	if not event then
+		return Logger.e( "Failed to remove poll option. User " .. user.fullname, userID .. " has no event" )
+	elseif not event.poll then
+		return Logger.e( "Failed to remove poll option. User " .. user.fullname, userID .. " has no poll" )
+	elseif not event.poll.choices[ index ] then
+		return Logger.e( "Failed to remove poll option. There is no poll option #" .. index .. " in users event " .. user.fullname, userID )
+	else
+		table.remove( event.poll.choices, index )
+
+		JSONPersist.saveToFile( ".events", self.events )
+		Logger.s( "Removed poll option "..index.." for " .. user.fullname )
+
+		return true
+	end
+end
+
+
 extends "Manager"
 return EventManager:compile()

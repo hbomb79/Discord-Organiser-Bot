@@ -197,6 +197,138 @@ commands = {
 		action = function( worker, message ) worker.eventManager:refreshRemote(); Reporter.success( message.author, "Remote refreshed", "The BGnS server has been refreshed to show most recent information" ) end
 	},
 
+	createPoll = {
+		help = "Creates a poll on the current event",
+		action = function( worker, message )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " is attempting to create a poll on their event" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot create poll. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to create poll", "You don't own an event. Create an event using **!create** before trying to create a poll" )
+			elseif ev.poll then
+				Logger.w( "Refusing to create poll. User " .. user.fullname, userID .. " already has a poll on their event -- creating another would overwrite the current poll" )
+				return Reporter.warning( user, "Failed to create poll", "You already have an active poll on your event. Use **!deletePoll** to remove your other poll" )
+			else
+				if events:createPoll( userID ) then
+					return Reporter.success( user, "Created poll", "Your poll has been created. Edit the description with **!setPollDesc** and add/remove/list options with **!addPollOption**, **!removePollOption** and **!listPollOptions**\n\nRemove the poll using **!deletePoll**. The poll will appear under your event while it is published (**!publish**)" )
+				else
+					Logger.e( "Failed to create poll for " .. user.fullname, userID )
+					return Reporter.failure( user, "Failed to create poll", "An unknown error has occurred which prevented the creation of your poll. Please try again later -- if issue persists contact <@157827690668359681> to report")
+				end
+			end
+		end
+	},
+
+	setPollDesc = {
+		help = "*TODO*",
+		action = function( worker, message, desc )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to set poll description" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot edit poll desc. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot edit poll desc. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			else
+				if events:setPollDesc( userID, desc ) then
+					return Reporter.success( user, "Edited poll", "Your poll description has been edited" )
+				else
+					Logger.e( "Failed to edit poll for " .. user.fullname, userID )
+					return Reporter.failure( user, "Failed to edit poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report")
+				end
+			end
+		end
+	},
+
+	addPollOption = {
+		help = "*TODO*",
+		action = function( worker, message, choice )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to add poll option" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot edit poll choices. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot edit poll choices. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			else
+				if events:addPollOption( userID, choice ) then
+					return Reporter.success( user, "Edited poll", "Your new option has been added to your poll at position " .. #ev.poll.choices .. ". Use **!removePollOption " .. #ev.poll.choices .. "** to remove this choice, or **!listPollOptions** to see all choices" )
+				else
+					Logger.e( "Failed to edit poll for " .. user.fullname, userID )
+					return Reporter.failure( user, "Failed to edit poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report")
+				end
+			end
+		end
+	},
+
+	listPollOptions = {
+		help = "*TODO*",
+		action = function( worker, message )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to list poll choices" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to view poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to view poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			else
+				local choices, str = ev.poll.choices, ""
+				for i = 1, #choices do
+					str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+				end
+			end
+		end
+	},
+
+	removePollOption = {
+		help = "*TODO*",
+		action = function( worker, message, index )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to remove poll choice" )
+
+			if not index then
+				Logger.i( "Command was not issued with a target option. Displaying options for removal." )
+			end
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to view poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to view poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			else
+				local choices, str = ev.poll.choices, ""
+				for i = 1, #choices do
+					str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+				end
+			end
+		end
+	},
+
+	deletePoll = {
+		help = "*TODO*",
+		action = function( worker, message )
+
+		end
+	},
+
 	yes = {
 		help = "*TODO*",
 		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 2 ) end
