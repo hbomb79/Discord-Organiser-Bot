@@ -195,7 +195,7 @@ function EventManager:pushEvent( target, userID )
 	end
 
 	if target == self.worker.cachedChannel then bulkDelete( target ) end
-	local message = target:send {
+	local message = Logger.assert( target:send {
 		embed = {
 			title = event.title,
 			description = event.desc,
@@ -209,7 +209,7 @@ function EventManager:pushEvent( target, userID )
 		    timestamp = os.date "!%Y-%m-%dT%H:%M:%S",
 			footer = { text = "Bot written by Hazza Bazza Boo" }
 		}
-	}
+	}, "Failed to push remote. Cannot continue", "Remote pushed" )
 
 	if event.published then
 		Logger.d( "Pushing a published event -- caching event announcement snowflake for use with reaction based RSVPs", "ID: " .. message.id )
