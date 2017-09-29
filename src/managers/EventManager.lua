@@ -191,7 +191,7 @@ function EventManager:pushEvent( target, userID )
 			end
 		end
 
-		return str
+		return str == "" and "*No RSVPs*" or str
 	end
 
 	if target == self.worker.cachedChannel then bulkDelete( target ) end
