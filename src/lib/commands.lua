@@ -209,6 +209,8 @@ commands = {
 			if not ev then
 				Logger.w( "Unable to revoke remote. No event is currently pushed." )
 				Reporter.failure( user, "Failed to revoke remote", "No event is currently published so no event can be revoked." )
+
+				return
 			end
 
 			local issuerLevel, authorLevel = worker:getAdminLevel( userID ), worker:getAdminLevel( ev.author )
