@@ -309,14 +309,16 @@ end
 ]]
 function EventManager:respondToEvent( userID, state )
 	local user, event = self.worker.client:getUser( userID ), self:getPublishedEvent()
+	if not event then
+		Reporter.warning( user, "Failed to RSVP", "No event is published -- can only RSVP to published events" )
+		return Logger.w "Cannot respond to event -- no event published"
+	end
+
 	local eventAuthor, stateName = self.worker.client:getUser( event.author ), EventManager.ATTEND_ENUM[ state ]
 	Logger.i( "Attempting to set RSVP state for " .. user.fullname .. " on published event (author: "..eventAuthor.fullname..") to state "..tostring( state ), userID )
 
 	if not state or not ( state == 0 or state == 1 or state == 2 ) then
 		return Logger.e( "Failed to RSVP. State '"..tostring( state ).."' is invalid. Can only be 0, 1, or 2 (not going, maybe, going respectively)" )
-	elseif not event then
-		Reporter.warning( user, "Failed to RSVP", "No event is published -- can only RSVP to published events" )
-		return Logger.w "Cannot respond to event -- no event published"
 	elseif event.author == userID then
 		Reporter.warning( user, "Failed to RSVP", "The published event is owned by you! Cannot RSVP to own event." )
 		Logger.w "Cannot respond to event -- cannot respond to own events"
