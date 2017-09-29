@@ -194,6 +194,7 @@ function EventManager:pushEvent( target, userID )
 		return str == "" and "*No RSVPs*" or str
 	end
 
+	local nickname = self.worker.cachedGuild:getMember( userID ).nickname
 	if target == self.worker.cachedChannel then bulkDelete( target ) end
 	local message = Logger.assert( target:send {
 		embed = {
@@ -203,6 +204,11 @@ function EventManager:pushEvent( target, userID )
 				{ name = "Location", value = event.location, inline = true },
 				{ name = "Timeframe", value = event.timeframe, inline = true },
 				{ name = "RSVPs (use the reactions underneath)", value = formResponses() }
+			},
+
+			author = {
+				name = ( nickname and nickname .. " (" or "" ) .. self.worker.client:getUser( userID ).name .. ( nickname and ")" or "" ),
+				icon_url = self.worker.client:getUser( userID ).avatarURL,
 			},
 
 			color = discordia.Color.fromRGB( 114, 137, 218 ).value,
