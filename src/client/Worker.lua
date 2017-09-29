@@ -96,6 +96,22 @@ function Worker:kill()
 	self.client:stop()
 end
 
+--[[
+	@instance
+	@desc
+]]
+function Worker:getAdminLevel( userID )
+	local member = self.cachedGuild:getMember( userID )
+	local admins = Worker.ADMIN_ROLE_IDS
+	for i = 1, #admins do
+		if member:hasRole( admins[ i ] ) then
+			return i
+		end
+	end
+
+	return false
+end
+
 configureConstructor {
 	orderedArguments = { "tokenLocation", "clientOptions" },
 	argumentTypes = { tokenLocation = "string", clientOptions = "table" }

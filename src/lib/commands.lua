@@ -1,22 +1,11 @@
 local Logger = require "src.client.Logger"
 local Reporter = require "src.helpers.Reporter"
 local Worker = require "src.client.Worker"
+local CommandHandler = require "src.lib.class".getClass "CommandHandler"
 
 --[[
 	WIP
 ]]
-
-local function getAdminLevel( worker, userID )
-	local member = worker.cachedGuild:getMember( userID )
-	local admins = Worker.ADMIN_ROLE_IDS
-	for i = 1, #admins do
-		if member:hasRole( admins[ i ] ) then
-			return i
-		end
-	end
-
-	return false
-end
 
 Logger.d "Building commands list (commands.lua)"
 -- format: command = { help = "help desc", admin = true|false, action = function };
@@ -200,6 +189,12 @@ commands = {
 		end
 	},
 
+	refreshRemote = {
+		help = "Forces the bot to refresh the BGnS server. If an event is published it will be refreshed on the server.\n\nThe bot should automatically push to remote so only use this command if the bot failed.",
+		admin = true,
+		action = function( worker, message ) worker.eventManager:refreshRemote(); Reporter.success( message.author, "Remote refreshed", "The BGnS server has been refreshed to show most recent information" ) end
+	},
+
 	yes = {
 		help = "*TODO*",
 		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 2 ) end
@@ -221,6 +216,7 @@ commands = {
 
 	banUser = {
 		help = "*TODO*",
+		admin = true,
 		action = function( worker, message, banTargetID )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -235,12 +231,8 @@ commands = {
 			end
 
 			Logger.i( "User " .. user.fullname .. " is attempting to ban user " .. banTarget.fullname )
-			local issuerAdminLevel, targetAdminLevel = getAdminLevel( worker, userID ), getAdminLevel( worker, banTargetID )
-			if not issuerAdminLevel then
-				-- Issuer is not admin
-				Logger.w( "Refusing to perform admin command! User " .. user.fullname .. " is not a BGnS administrator")
-				Reporter.warning( user, "Cannot ban user", "Your account is not an administrator on the BGnS server. You are not permitted to execute admin commands." )
-			elseif banTargetID == userID then
+			local issuerAdminLevel, targetAdminLevel = worker:getAdminLevel( worker, userID ), worker:getAdminLevel( worker, banTargetID )
+			if banTargetID == userID then
 				Logger.e( "User " .. user.fullname .. " tried to ban themselves. Rejecting request" )
 				return Reporter.failure( user, "Failed to ban", "You cannot ban yourself, silly!" )
 			elseif targetAdminLevel and issuerAdminLevel > targetAdminLevel then
@@ -262,6 +254,7 @@ commands = {
 
 	unbanUser = {
 		help = "*TODO*",
+		admin = true,
 		action = function( worker, message, unbanTargetID )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -276,20 +269,12 @@ commands = {
 			end
 
 			Logger.i( "User " .. user.fullname .. " is attempting to lift ban on user " .. banTarget.fullname )
-			local issuerAdminLevel = getAdminLevel( worker, userID )
-			if not issuerAdminLevel then
-				-- Issuer is not admin
-				Logger.w( "Refusing to perform admin command! User " .. user.fullname .. " is not a BGnS administrator")
-				Reporter.warning( user, "Cannot unban user", "Your account is not an administrator on the BGnS server. You are not permitted to execute admin commands." )
+			if worker.messageManager.restrictionManager:unbanUser( banTarget.id ) then
+				Logger.s( "Unbanned user " .. banTarget.fullname )
+				Reporter.success( user, "Lifted user ban", "User " .. banTarget.fullname .. " has been unbanned. \n\nThe user has been notified." )
+				Reporter.success( banTarget, "You have been un-banned", "A BGnS administrator has explicitly lifted your ban. You are now free to interact with this bot (within reason -- spam will automatically trigger a permanent suspension)." )
 			else
-				Logger.s( "Issuer of command is within rights to lift ban" )
-				if worker.messageManager.restrictionManager:unbanUser( banTarget.id ) then
-					Logger.s( "Banned user " .. banTarget.fullname )
-					Reporter.success( user, "Lifted user ban", "User " .. banTarget.fullname .. " has been unbanned. \n\nThe user has been notified." )
-					Reporter.success( banTarget, "You have been un-banned", "A BGnS administrator has explicitly lifted your ban. You are now free to interact with this bot (within reason -- spam will automatically trigger a permanent suspension)." )
-				else
-					Reporter.failure( user, "Failed to lift user ban", "Unknown error occurred. Please try again later" )
-				end
+				Reporter.failure( user, "Failed to lift user ban", "Unknown error occurred. Please try again later" )
 			end
 		end
 	}
@@ -316,6 +301,8 @@ for i = 1, #VALID_FIELDS do
 				if events:updateEvent( userID, field, value ) then
 					Logger.s "Updated event successfully"
 					Reporter.success( user, "Successfully set field", "The " .. field .. " property for your event is now '".. value.."'.")
+
+					return true
 				else
 					Logger.e( "Failed to set field '"..field.."' for event owned by " .. tostring( user.fullname ) )
 					Reporter.failure( user, "Failed to set " .. field, "Unknown error occurred. Please try again later, or contact <@157827690668359681> directly for assistance" )

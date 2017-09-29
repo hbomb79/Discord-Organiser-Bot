@@ -77,9 +77,9 @@ function EventManager:createEvent( userID )
 		timeframe = "N/A";
 		author = userID;
 
-		polls = {};
 		responses = {};
 
+		poll = false;
 		rules = false;
 		published = false;
 	}

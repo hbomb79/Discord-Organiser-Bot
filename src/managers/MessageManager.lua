@@ -42,6 +42,7 @@ local MessageManager = class "MessageManager" {
 	owner = false;
 	queue = {};
 	userRequests = {};
+	promptModes = {};
 }
 
 function MessageManager:__init__( ... )
@@ -144,16 +145,21 @@ function MessageManager:startQueue()
 		if not self.restrictionManager:isUserRestricted( author.id, true ) then
 			if checkMutalGuild( author ) then
 				author:getPrivateChannel():broadcastTyping()
-				local state = self:checkCommandValid( item.content )
-				if state == 0 then
-					Logger.w( "Cannot process command " .. item.content, "Invalid syntax" )
-					Reporter.warning( author, "Failed to Process Command", "The command is syntactically invalid. Ensure it is in the form **!<commandName> [arg1, [arg2, [...]]]**" )
-				elseif state == 1 then
-					Logger.w( "Cannot process command " .. item.content, "Does not exist" )
-					Reporter.warning( author, "Failed to Process Command", "The command you requested does not exist. Check for typos and ensure you have whitespace between your arguments" )
-				elseif state == 2 then
-					Logger.i( "Executing command " .. item.content )
-					self:executeCommand( item, item.content )
+				if self.promptModes[ author.id ] then
+					Logger.i( "Checking response to prompt ("..self.promptModes[ author.id ]..")" )
+					self:handlePromptResponse( item, item.content )
+				else
+					local state = self:checkCommandValid( item.content )
+					if state == 0 then
+						Logger.w( "Cannot process command " .. item.content, "Invalid syntax" )
+						Reporter.warning( author, "Failed to Process Command", "The command is syntactically invalid. Ensure it is in the form **!<commandName> [arg1, [arg2, [...]]]**" )
+					elseif state == 1 then
+						Logger.w( "Cannot process command " .. item.content, "Does not exist" )
+						Reporter.warning( author, "Failed to Process Command", "The command you requested does not exist. Check for typos and ensure you have whitespace between your arguments" )
+					elseif state == 2 then
+						Logger.i( "Executing command " .. item.content )
+						self:handleCommand( item, item.content )
+					end
 				end
 			else Reporter.warning( author, "Failed to Process Command", "Your user is not a member of the target guild. You are not permitted to execute commands via this bot.\n\nContact the guild owner if you believe this warning is incorrect" ) end
 		else Logger.w( "Ignoring queue item -- author", author.fullname .. " is restricted OR banned" ) end
