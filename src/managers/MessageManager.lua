@@ -4,11 +4,12 @@ local Class = require "src.lib.class"
 local Reporter = require "src.helpers.Reporter"
 local Worker = require "src.client.Worker"
 local discordia = luvitRequire "discordia"
+local EventManager = require "src.managers.EventManager"
 
 local wrap = function( f ) return coroutine.wrap( f )() end
 
 -- Compile CommandHandler so we can mixin later
-require "src.client.CommandHandler"
+local CommandHandler = require "src.client.CommandHandler"
 
 local function checkMutalGuild( author )
 	local targetGuild = Class.getClass "Worker".static.GUILD_ID
@@ -42,6 +43,7 @@ local MessageManager = class "MessageManager" {
 	owner = false;
 	queue = {};
 	userRequests = {};
+	promptModes = {};
 }
 
 function MessageManager:__init__( ... )
@@ -85,17 +87,39 @@ end
 	@instance
 	@desc WIP
 ]]
+function MessageManager:setPromptMode( userID, mode )
+	local user = self.worker.client:getUser( userID )
+	if not user then
+		return Logger.w("Failed to set prompt mode for user " .. userID .. ". User ID invalid.")
+	end
+
+	self.promptModes[ userID ] = mode
+	user:send( mode and CommandHandler.PROMPT_MODE_HELP[ mode ] .. " -- __or__ use **!skip** to move on, or use **!skipall** to leave prompt mode" or "**Prompt mode exited** -- commands can be entered normally." )
+
+	Logger.s( "Notified " .. user.fullname .. " that they are " .. ( mode and "in prompt mode" or "no longer in prompt mode" ), select( 2, pcall( error, "hit", 4 ) ) )
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
 function MessageManager:handleNewReaction( reaction, userID )
 	if self.worker.client:getUser( userID ).bot or self.restrictionManager:isUserBanned( userID ) then return end
 	local events, message = self.worker.eventManager, reaction.message
 
 	local event = events:getPublishedEvent()
-	if not event or not event.pushedSnowflake or event.pushedSnowflake ~= message.id then
-		return Logger.w "Reaction was added to invalid target. Ensure an event is published and pushed to allow reaction-based RSVPs"
-	end
+	if not ( event and event.pushedSnowflake ) then return
+	elseif message.id == event.pushedSnowflake then
+		Logger.i "Submitting attendee status via reaction"
+		events:respondToEvent( userID, MessageManager.REACTION_ENUM[ reaction.emojiName ] )
+	elseif event.poll and message.id == event.poll.pushedSnowflake then
+		Logger.i "Submitting poll vote via reaction"
 
-	events:respondToEvent( userID, MessageManager.REACTION_ENUM[ reaction.emojiName ] )
-	Logger.s "Handled reaction"
+		local emojiNames = EventManager.CHOICE_REACTIONS
+		for i = 1, #emojiNames do
+			if emojiNames[ i ] == reaction.emojiName then events:submitPollVote( userID, i ); break end
+		end
+	end
 end
 
 --[[
@@ -144,16 +168,21 @@ function MessageManager:startQueue()
 		if not self.restrictionManager:isUserRestricted( author.id, true ) then
 			if checkMutalGuild( author ) then
 				author:getPrivateChannel():broadcastTyping()
-				local state = self:checkCommandValid( item.content )
-				if state == 0 then
-					Logger.w( "Cannot process command " .. item.content, "Invalid syntax" )
-					Reporter.warning( author, "Failed to Process Command", "The command is syntactically invalid. Ensure it is in the form **!<commandName> [arg1, [arg2, [...]]]**" )
-				elseif state == 1 then
-					Logger.w( "Cannot process command " .. item.content, "Does not exist" )
-					Reporter.warning( author, "Failed to Process Command", "The command you requested does not exist. Check for typos and ensure you have whitespace between your arguments" )
-				elseif state == 2 then
-					Logger.i( "Executing command " .. item.content )
-					self:executeCommand( item, item.content )
+				if self.promptModes[ author.id ] then
+					Logger.i( "Checking response to prompt ("..self.promptModes[ author.id ]..")" )
+					self:handlePromptResponse( item, item.content )
+				else
+					local state = self:checkCommandValid( item.content )
+					if state == 0 then
+						Logger.w( "Cannot process command " .. item.content, "Invalid syntax" )
+						Reporter.warning( author, "Failed to Process Command", "The command is syntactically invalid. Ensure it is in the form **!<commandName> [arg1, [arg2, [...]]]**" )
+					elseif state == 1 then
+						Logger.w( "Cannot process command " .. item.content, "Does not exist" )
+						Reporter.warning( author, "Failed to Process Command", "The command you requested does not exist. Check for typos and ensure you have whitespace between your arguments" )
+					elseif state == 2 then
+						Logger.i( "Executing command " .. item.content )
+						self:handleCommand( item, item.content )
+					end
 				end
 			else Reporter.warning( author, "Failed to Process Command", "Your user is not a member of the target guild. You are not permitted to execute commands via this bot.\n\nContact the guild owner if you believe this warning is incorrect" ) end
 		else Logger.w( "Ignoring queue item -- author", author.fullname .. " is restricted OR banned" ) end

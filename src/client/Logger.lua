@@ -76,6 +76,8 @@ end
 for k in pairs( Logger.static.modes ) do
 	Logger.static[ k:sub( 1, 1 ):lower() ] = function( ... )
 		Logger.static.out( k, ... )
+
+		return k == "SUCCESS", table.concat( { ... }, " | " )
 	end
 end
 

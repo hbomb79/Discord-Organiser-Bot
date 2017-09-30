@@ -1,22 +1,11 @@
 local Logger = require "src.client.Logger"
 local Reporter = require "src.helpers.Reporter"
 local Worker = require "src.client.Worker"
+local CommandHandler = require "src.lib.class".getClass "CommandHandler"
 
 --[[
 	WIP
 ]]
-
-local function getAdminLevel( worker, userID )
-	local member = worker.cachedGuild:getMember( userID )
-	local admins = Worker.ADMIN_ROLE_IDS
-	for i = 1, #admins do
-		if member:hasRole( admins[ i ] ) then
-			return i
-		end
-	end
-
-	return false
-end
 
 Logger.d "Building commands list (commands.lua)"
 -- format: command = { help = "help desc", admin = true|false, action = function };
@@ -36,7 +25,7 @@ commands = {
 						if commands[ com ] then
 							local h = commands[ com ].help
 							Logger.d( "Serving help for cmd " .. com )
-							fields[ #fields + 1 ] = { name = "!"..com, value = #h == 0 and "**HELP UNAVAILABLE**" or h }
+							fields[ #fields + 1 ] = { name = "__!".. com .. "__", value = ( com.admin and "*This command can only be executed by BGnS administrators*\n\n" or "" ) .. ( #h == 0 and "**HELP UNAVAILABLE**" or h ) }
 						else
 							Logger.w( "Help information not available for "..com )
 							invalidFields[ #invalidFields + 1 ] = com
@@ -57,7 +46,7 @@ commands = {
 				else
 					local fields = {}
 					for name, config in pairs( commands ) do
-						fields[ #fields + 1 ] = { name = "!" .. name, value = #config.help == 0 and "**HELP UAVAILABLE**" or config.help }
+						fields[ #fields + 1 ] = { name = "__!" .. name .. "__", value = ( config.admin and "*This command can only be executed by BGnS administrators*\n\n" or "" ) .. ( #config.help == 0 and "**HELP UAVAILABLE**" or config.help ) }
 					end
 
 					Reporter.info( message.author, "Command Help", "Below is a list of help information for each of the commands you can use. " .. tostring( #fields ), unpack( fields ) )
@@ -90,6 +79,8 @@ commands = {
 			if worker.eventManager:createEvent( userID ) then
 				Logger.i("Created new event -- notifying user")
 				Reporter.success( user, "Created event", "Your event has been successfully created.\n\nCustomize it using any of: !setTitle, !setLocation, !setTimeframe, !setDesc (for each 'set' command their is a 'get' version too)!\n\n*Happy hosting!*")
+
+				worker.messageManager:setPromptMode( userID, CommandHandler.PROMPT_MODE_ENUM.CREATE_TITLE )
 			else
 				Logger.w("Failed to create new event -- notifying user")
 				Reporter.warning( user, "Failed to create new event", "Please try again later." )
@@ -200,27 +191,240 @@ commands = {
 		end
 	},
 
+	refreshRemote = {
+		help = "Forces the bot to refresh the BGnS server. If an event is published it will be refreshed on the server.\n\nThe bot should automatically push to remote so only use this command if the bot failed.",
+		admin = true,
+		action = function( worker, message ) worker.eventManager:refreshRemote( true ); Reporter.success( message.author, "Remote refreshed", "The BGnS server has been refreshed to show most recent information" ) end
+	},
+
+	revokeRemote = {
+		help = "Forces the bot to unpublish the currently published event. The event host will be notified. It is suggested that troublesome users be banned using **!banUser**.",
+		admin = true,
+		action = function( worker, message )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " is attempting to revoke remote." )
+
+			local ev = events:getPublishedEvent()
+			if not ev then
+				Logger.w( "Unable to revoke remote. No event is currently pushed." )
+				Reporter.failure( user, "Failed to revoke remote", "No event is currently published so no event can be revoked." )
+
+				return
+			end
+
+			local issuerLevel, authorLevel = worker:getAdminLevel( userID ), worker:getAdminLevel( ev.author )
+			if ev.author == userID or ( not authorLevel or authorLevel > issuerLevel ) then
+				Logger.s( "User is within their rights to revoke event" )
+				events:unpublishEvent()
+
+				Reporter.success( user, "Event revoked", "The published event has been revoked -- the event host will be notified" )
+				Reporter.failure( worker.client:getUser( ev.author ), "Your event has been revoked", "Your event has been forcefully revoked from the BGnS server. If you believe this is in error, or wish to learn more about why this decision was made, contact <@"..userID..">" )
+
+				return true
+			end
+		end
+	},
+
+	createPoll = {
+		help = "Creates a poll on the current event",
+		action = function( worker, message )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " is attempting to create a poll on their event" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot create poll. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to create poll", "You don't own an event. Create an event using **!create** before trying to create a poll" )
+			elseif ev.poll then
+				Logger.w( "Refusing to create poll. User " .. user.fullname, userID .. " already has a poll on their event -- creating another would overwrite the current poll" )
+				return Reporter.warning( user, "Failed to create poll", "You already have an active poll on your event. Use **!deletePoll** to remove your other poll" )
+			else
+				if events:createPoll( userID ) then
+					return Reporter.success( user, "Created poll", "Your poll has been created. Edit the description with **!setPollDesc** and add/remove/list options with **!addPollOption**, **!removePollOption** and **!listPollOptions**\n\nRemove the poll using **!deletePoll**. The poll will appear under your event while it is published (**!publish**)" )
+				else
+					Logger.e( "Failed to create poll for " .. user.fullname, userID )
+					return Reporter.failure( user, "Failed to create poll", "An unknown error has occurred which prevented the creation of your poll. Please try again later -- if issue persists contact <@157827690668359681> to report")
+				end
+			end
+		end
+	},
+
+	setPollDesc = {
+		help = "Set's the description of the poll attached to the users event",
+		action = function( worker, message, desc )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to set poll description" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot edit poll desc. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot edit poll desc. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			else
+				if events:setPollDesc( userID, desc ) then
+					return Reporter.success( user, "Edited poll", "Your poll description has been edited" )
+				else
+					Logger.e( "Failed to edit poll for " .. user.fullname, userID )
+					return Reporter.failure( user, "Failed to edit poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report")
+				end
+			end
+		end
+	},
+
+	addPollOption = {
+		help = "Adds a poll option the poll attached to the users event",
+		action = function( worker, message, choice )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to add poll option" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot edit poll choices. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot edit poll choices. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			elseif #ev.poll.choices >= 10 then
+				Logger.w( "Refusing to edit poll choices. User " .. user.fullname, userID .. " already has 10 options saved." )
+				return Reporter.failure( user, "Failed to edit poll", "You have reached the maximum amount of poll choices (10). Remove some options using **!removePollOption**")
+			elseif not ( choice and choice:find "%w" ) then
+				worker.messageManager:setPromptMode( userID, CommandHandler.PROMPT_MODE_ENUM.POLL_CHOICE_ADD )
+			else
+				if events:addPollOption( userID, choice ) then
+					Reporter.success( user, "Edited poll", "Your new option has been added to your poll at position " .. #ev.poll.choices .. ". Use **!removePollOption " .. #ev.poll.choices .. "** to remove this choice, or **!listPollOptions** to see all choices" )
+					return true
+				else
+					Logger.e( "Failed to edit poll for " .. user.fullname, userID )
+					return Reporter.failure( user, "Failed to edit poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report" )
+				end
+			end
+		end
+	},
+
+	listPollOptions = {
+		help = "Lists the poll options for the poll attached to the users event",
+		action = function( worker, message )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to list poll choices" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to view poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to view poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			else
+				local choices, str = ev.poll.choices, ""
+				if #choices == 0 then
+					Reporter.info( user, "Poll Options", "No options. Add one by using **!addPollOption**.\n\nYour poll won't display on the BGnS server until it has options attached to it" )
+				else
+					for i = 1, #choices do
+						str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+					end
+
+					Reporter.info( user, "Poll Options", str )
+				end
+			end
+		end
+	},
+
+	removePollOption = {
+		help = "Removes the poll option at the index provided: **!removePollOption [index]**\n\nIf index is nil (not provided or invalid number) then a list of poll options is shown and the user is asked which option to remove",
+		action = function( worker, message, index )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " attempting to remove poll choice" )
+
+			index = tonumber( index )
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't own an event. Create an event using **!create** before editing a poll" )
+			elseif not ev.poll then
+				Logger.w( "Cannot view poll options. User " .. user.fullname, userID .. " has no poll" )
+				return Reporter.warning( user, "Failed to edit poll", "You don't have a poll. Create a poll using **!createPoll** before editing a poll" )
+			else
+				local choices, str = ev.poll.choices, ""
+				if #choices == 0 then
+					return Reporter.warning( user, "Cannot remove option", "You have no options stored on you poll. Add them using **!addPollOption**" )
+				elseif not index then
+					Logger.i( "Command was not issued with a target option. Displaying options for removal." )
+					for i = 1, #choices do
+						str = str .. ( "%s) %s%s" ):format( i, choices[ i ], ( i == #choices and "" or "\n\n" ) )
+					end
+
+					Reporter.info( user, "Poll Options", str )
+					if worker.messageManager.promptModes[ userID ] == CommandHandler.PROMPT_MODE_ENUM.POLL_REMOVE then
+						Reporter.failure( user, "Invalid index", "The index provided is invalid. Please retry with a valid index (a integer that corresponds to an option in the list)" )
+					else
+						worker.messageManager:setPromptMode( userID, CommandHandler.PROMPT_MODE_ENUM.POLL_REMOVE )
+					end
+				else
+					if events:removePollOption( userID, index ) then
+						Reporter.success( user, "Removed poll option", "We removed that option for you. Use **!listPollOptions** to see the remaining options for your poll" )
+						return true
+					else
+						Reporter.failure( user, "Failed to remove poll option", "An unkown error occured. Ensure that a poll option at index '"..index.."' exists before retrying" )
+					end
+				end
+			end
+		end
+	},
+
+	deletePoll = {
+		help = "Remove the poll attached to your event. If the event is published the remote is refreshed",
+		action = function( worker, message )
+			local user, events = message.author, worker.eventManager
+			local userID = user.id
+			Logger.i( "User " .. user.fullname .. " is attempting to delete poll" )
+
+			local ev = events:getEvent( userID )
+			if not ev then
+				Logger.w( "Cannot delete poll. User " .. user.fullname, userID .. " has no event" )
+				return Reporter.warning( user, "Failed to delete poll", "You don't own an event." )
+			elseif not ev.poll then
+				Logger.w( "Cannot delete poll. User " .. user.fullname, userID .. " has no poll attached to their event" )
+				return Reporter.warning( user, "Failed to delete poll", "You don't have a poll." )
+			else
+				if events:deletePoll( userID ) then
+					Reporter.success( user, "Deleted poll", "Your poll has been deleted." .. ( ev.published and " It has been revoked from the remote server (BGnS server) and can no longer be voted on" or "" ) )
+				else
+					Reporter.failure( user, "Cannot delete poll", "An unknown error has occurred which prevented editing your poll. Please try again later -- if issue persists contact <@157827690668359681> to report" )
+				end
+			end
+		end
+	},
+
 	yes = {
-		help = "*TODO*",
+		help = "Tell the host of the published event that you *are attending*",
 		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 2 ) end
 	},
 
 	maybe = {
-		help = "*TODO*",
+		help = "Tell the host of the published event that you *might be attending*",
 		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 1 ) end
 	},
 
 	no = {
-		help = "*TODO*",
+		help = "Tell the host of the published event that you *not attending*",
 		action = function( worker, message ) worker.eventManager:respondToEvent( message.author.id, 0 ) end
 	},
 
 	view = {
-		help = "*TODO*"
+		help = "NYI"
 	},
 
 	banUser = {
-		help = "*TODO*",
+		help = "Ban the userID provided from interacting with the bot. Command must be provided with a resolvable userID (member of cached guild)\n\nThe user will be notified",
+		admin = true,
 		action = function( worker, message, banTargetID )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -235,12 +439,8 @@ commands = {
 			end
 
 			Logger.i( "User " .. user.fullname .. " is attempting to ban user " .. banTarget.fullname )
-			local issuerAdminLevel, targetAdminLevel = getAdminLevel( worker, userID ), getAdminLevel( worker, banTargetID )
-			if not issuerAdminLevel then
-				-- Issuer is not admin
-				Logger.w( "Refusing to perform admin command! User " .. user.fullname .. " is not a BGnS administrator")
-				Reporter.warning( user, "Cannot ban user", "Your account is not an administrator on the BGnS server. You are not permitted to execute admin commands." )
-			elseif banTargetID == userID then
+			local issuerAdminLevel, targetAdminLevel = worker:getAdminLevel( userID ), worker:getAdminLevel( banTargetID )
+			if banTargetID == userID then
 				Logger.e( "User " .. user.fullname .. " tried to ban themselves. Rejecting request" )
 				return Reporter.failure( user, "Failed to ban", "You cannot ban yourself, silly!" )
 			elseif targetAdminLevel and issuerAdminLevel > targetAdminLevel then
@@ -261,7 +461,8 @@ commands = {
 	},
 
 	unbanUser = {
-		help = "*TODO*",
+		help = "Lifts a ban on the userID provided. Command must be provided with a resolvable userID (member of cached guild)\n\nThe user will be notified",
+		admin = true,
 		action = function( worker, message, unbanTargetID )
 			local user, events = message.author, worker.eventManager
 			local userID = user.id
@@ -276,20 +477,12 @@ commands = {
 			end
 
 			Logger.i( "User " .. user.fullname .. " is attempting to lift ban on user " .. banTarget.fullname )
-			local issuerAdminLevel = getAdminLevel( worker, userID )
-			if not issuerAdminLevel then
-				-- Issuer is not admin
-				Logger.w( "Refusing to perform admin command! User " .. user.fullname .. " is not a BGnS administrator")
-				Reporter.warning( user, "Cannot unban user", "Your account is not an administrator on the BGnS server. You are not permitted to execute admin commands." )
+			if worker.messageManager.restrictionManager:unbanUser( banTarget.id ) then
+				Logger.s( "Unbanned user " .. banTarget.fullname )
+				Reporter.success( user, "Lifted user ban", "User " .. banTarget.fullname .. " has been unbanned. \n\nThe user has been notified." )
+				Reporter.success( banTarget, "You have been un-banned", "A BGnS administrator has explicitly lifted your ban. You are now free to interact with this bot (within reason -- spam will automatically trigger a permanent suspension)." )
 			else
-				Logger.s( "Issuer of command is within rights to lift ban" )
-				if worker.messageManager.restrictionManager:unbanUser( banTarget.id ) then
-					Logger.s( "Banned user " .. banTarget.fullname )
-					Reporter.success( user, "Lifted user ban", "User " .. banTarget.fullname .. " has been unbanned. \n\nThe user has been notified." )
-					Reporter.success( banTarget, "You have been un-banned", "A BGnS administrator has explicitly lifted your ban. You are now free to interact with this bot (within reason -- spam will automatically trigger a permanent suspension)." )
-				else
-					Reporter.failure( user, "Failed to lift user ban", "Unknown error occurred. Please try again later" )
-				end
+				Reporter.failure( user, "Failed to lift user ban", "Unknown error occurred. Please try again later" )
 			end
 		end
 	}
@@ -316,6 +509,8 @@ for i = 1, #VALID_FIELDS do
 				if events:updateEvent( userID, field, value ) then
 					Logger.s "Updated event successfully"
 					Reporter.success( user, "Successfully set field", "The " .. field .. " property for your event is now '".. value.."'.")
+
+					return true
 				else
 					Logger.e( "Failed to set field '"..field.."' for event owned by " .. tostring( user.fullname ) )
 					Reporter.failure( user, "Failed to set " .. field, "Unknown error occurred. Please try again later, or contact <@157827690668359681> directly for assistance" )
