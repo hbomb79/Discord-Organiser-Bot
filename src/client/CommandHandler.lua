@@ -95,7 +95,7 @@ function CommandHandler:executeCommand( commandName, ... )
 	if not com then return Logger.e( "Failed to load action for command '"..commandName.."'" ) end
 
 	Logger.i( "Executing action for command '" .. commandName .. "'" )
-	local r = { com.action( self.worker, ... ) }
+	local r = { coroutine.wrap( com.action )( self.worker, ... ) }
 	Logger.s( "Command for '" .. commandName .. "' executed" )
 
 	return unpack( r )
