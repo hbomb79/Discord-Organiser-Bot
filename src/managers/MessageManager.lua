@@ -4,6 +4,7 @@ local Class = require "src.lib.class"
 local Reporter = require "src.helpers.Reporter"
 local Worker = require "src.client.Worker"
 local discordia = luvitRequire "discordia"
+local EventManager = require "src.managers.EventManager"
 
 local wrap = function( f ) return coroutine.wrap( f )() end
 
@@ -107,12 +108,18 @@ function MessageManager:handleNewReaction( reaction, userID )
 	local events, message = self.worker.eventManager, reaction.message
 
 	local event = events:getPublishedEvent()
-	if not event or not event.pushedSnowflake or event.pushedSnowflake ~= message.id then
-		return Logger.w "Reaction was added to invalid target. Ensure an event is published and pushed to allow reaction-based RSVPs"
-	end
+	if not ( event and event.pushedSnowflake ) then return
+	elseif message.id == event.pushedSnowflake then
+		Logger.i "Submitting attendee status via reaction"
+		events:respondToEvent( userID, MessageManager.REACTION_ENUM[ reaction.emojiName ] )
+	elseif event.poll and message.id == event.poll.pushedSnowflake then
+		Logger.i "Submitting poll vote via reaction"
 
-	events:respondToEvent( userID, MessageManager.REACTION_ENUM[ reaction.emojiName ] )
-	Logger.s "Handled reaction"
+		local emojiNames = EventManager.CHOICE_REACTIONS
+		for i = 1, #emojiNames do
+			if emojiNames[ i ] == reaction.emojiName then events:submitPollVote( userID, i ); break end
+		end
+	end
 end
 
 --[[

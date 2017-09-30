@@ -194,7 +194,7 @@ commands = {
 	refreshRemote = {
 		help = "Forces the bot to refresh the BGnS server. If an event is published it will be refreshed on the server.\n\nThe bot should automatically push to remote so only use this command if the bot failed.",
 		admin = true,
-		action = function( worker, message ) worker.eventManager:refreshRemote(); Reporter.success( message.author, "Remote refreshed", "The BGnS server has been refreshed to show most recent information" ) end
+		action = function( worker, message ) worker.eventManager:refreshRemote( true ); Reporter.success( message.author, "Remote refreshed", "The BGnS server has been refreshed to show most recent information" ) end
 	},
 
 	revokeRemote = {
