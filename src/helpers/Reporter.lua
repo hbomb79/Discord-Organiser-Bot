@@ -28,7 +28,7 @@ function Reporter.static.send( target, colour, title, description, ... )
 	-- 		return Logger.w( "Refusing to send message '"..title.."' to user " .. target.fullname, "User is banned or restricted" )
 	-- 	end
 	-- end
-
+	
 	coroutine.wrap( function()
 		target:send {
 			embed = {

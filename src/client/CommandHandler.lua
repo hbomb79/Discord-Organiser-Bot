@@ -2,13 +2,6 @@ local Logger = require "src.client.Logger"
 local Class = require "src.lib.class"
 local Reporter = require "src.helpers.Reporter"
 
-local function splitArguments( val )
-    local parts = {}
-    for match in val:gmatch "(%S+)%s*" do parts[ #parts + 1 ] = match end
-
-    return parts
-end
-
 
 --[[
 	WIP
@@ -64,7 +57,7 @@ function CommandHandler:handlePromptResponse( message, response )
 		elseif response:find "^%!skip" then
 			self:setPromptMode( userID, target )
 		else
-			if self:executeCommand( command, message, response, ... ) then self:setPromptMode( userID, target ) else self:setPromptMode( userID, self.promptModes[ userID ] ) end
+			if self:executeCommand( command, message, response, ... ) then self:setPromptMode( userID, target ) end
 		end
 	end
 
@@ -90,15 +83,23 @@ end
 	@instance
 	@desc WIP
 ]]
-function CommandHandler:executeCommand( commandName, ... )
+function CommandHandler:executeCommand( commandName, message, commandArg )
 	local com = CommandHandler.static.commands[ commandName ]
 	if not com then return Logger.e( "Failed to load action for command '"..commandName.."'" ) end
 
 	Logger.i( "Executing action for command '" .. commandName .. "'" )
-	local r = { coroutine.wrap( com.action )( self.worker, ... ) }
-	Logger.s( "Command for '" .. commandName .. "' executed" )
+	local events, user = self.worker.eventManager, message.author
+	local ok, reason, code = com.action( events, user, message, commandArg )
+	print( tostring( ok ) )
+	print( tostring( reason ) )
+	print( tostring( code ) )
 
-	return unpack( r )
+	if ok then Logger.s( "Executed command -- invoking 'onSuccess'" ) else Logger.e( "Command execution failed gracefully -- invoking 'onFailure'") end
+
+	local cb = com[ "on" .. ( ok and "Success" or "Failure" ) ]
+	if type( cb ) == "function" then cb( events, user, message, reason, code or ok, commandArg ) end
+
+	return ok
 end
 
 --[[
@@ -121,7 +122,8 @@ function CommandHandler:handleCommand( message, command )
 		Logger.s( "User is authorized to execute command" )
 	end
 
-	return self:executeCommand( commandName, message, arg, unpack( splitArguments( arg ) ) )
+
+	return coroutine.wrap( self.executeCommand )( self, commandName, message, arg )
 end
 
 return abstract( true ):compile()

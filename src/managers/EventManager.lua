@@ -96,6 +96,11 @@ local function generateEmbed( event, worker, forPoll )
 	end
 end
 
+local function report( code, ... )
+	local _, reason = Logger.w( ... )
+	return false, reason, code
+end
+
 --[[
 	WIP
 ]]
@@ -155,11 +160,10 @@ end
 ]]
 function EventManager:createEvent( userID )
 	local name = self.worker.client:getUser( userID ).fullname
-	Logger.i( "Creating event for " .. name )
+	Logger.i( "Creating event for " .. name, userID )
 
 	if self.events[ userID ] then
-		Logger.e( "Refusing to create event for user: " .. name, "The user ("..userID..") already owns an event." )
-		return false
+		return report( 1, "Refusing to create event because the user ("..name..") already owns an event" )
 	end
 
 	self.events[ userID ] = {
@@ -177,9 +181,7 @@ function EventManager:createEvent( userID )
 	}
 
 	self:saveEvents( event )
-	Logger.s( "Created and saved event for " .. name .. " ["..userID.."]" )
-
-	return true
+	return Logger.s( "Created and saved event for " .. name )
 end
 
 --[[
@@ -188,25 +190,26 @@ end
 ]]
 function EventManager:removeEvent( userID, noUnpublish )
 	local name = self.worker.client:getUser( userID ).fullname
-	Logger.i( "Removing event for " .. name )
+	Logger.i( "Removing event for " .. name, userID )
 
 	if not self.events[ userID ] then
-		Logger.e( "Refusing to remove event for user: " .. name, "The user ("..userID..") owns no event.")
-		return false
+		return report( 1, "Refusing to remove event because the user ("..name..") has no events" )
 	elseif self.events[ userID ].published then
 		if noUnpublish then
-			return Logger.e( "Attempting to remove '" .. name .. "' event although it has already been published -- refusing to remove" )
+			return report( 2, "Refusing to remove event because the user ("..name..") has already published their event" )
 		else
 			Logger.i( "Attempting to remove '" .. name .. "' event although it has already been published -- unpublishing event first" )
-			self:unpublishEvent( userID )
+
+			local ok, err, code = self:unpublishEvent( userID )
+			if not ok then
+				return false, err, type( code ) == "number" and code + 2 or code
+			end
 		end
 	end
 
 	self.events[ userID ] = nil
 	self:saveEvents()
-	Logger.s( "Removed event for " .. name .. " ["..userID.."]" )
-
-	return true
+	return Logger.s( "Removed event for " .. name )
 end
 
 --[[
@@ -215,22 +218,20 @@ end
 ]]
 function EventManager:publishEvent( userID )
 	local name = self.worker.client:getUser( userID ).fullname
-	Logger.i( "Publishing event for " .. name )
+	Logger.i( "Publishing event for " .. name, userID )
 
 	local event = self.events[ userID ]
 	if not event then
-		return Logger.e( "Refusing to publish event for user " .. name, "The user ("..userID..") owns no event." )
+		return report( 1, "Refusing to publish event for user (" .. name .. ") because the user has no events" )
 	elseif event.published then
-		return Logger.w( "Refusing to publish event for user " .. name, "Event already published" )
+		return report( 2, "The users ("..name..") event has already been published" )
 	end
 
 	event.published = true
 	self:saveEvents( event )
-	Logger.s( "Published event for " .. name .. " ["..userID.."]" )
-
 	self:refreshRemote()
 
-	return true
+	return Logger.s( "Published event for " .. name )
 end
 
 --[[
@@ -240,7 +241,7 @@ end
 function EventManager:unpublishEvent()
 	local publishedEvent = self:getPublishedEvent()
 	if not publishedEvent then
-		return Logger.e( "Unable to unpublish event. No event is published" )
+		return report( 1, "Unable to unpublish event. No event is published" )
 	end
 
 	local name = self.worker.client:getUser( publishedEvent.author ).fullname
@@ -250,11 +251,9 @@ function EventManager:unpublishEvent()
 	publishedEvent.pushedSnowflake = nil
 
 	self:saveEvents()
-	Logger.s( "Unpublished event for " .. name .. " ["..publishedEvent.author.."]" )
-
 	self:refreshRemote( true )
 
-	return true
+	return Logger.s( "Unpublished event for " .. name )
 end
 
 --[[
@@ -262,7 +261,7 @@ end
 	@desc Forcefully pushes to the remote by clearing the target channel (if not private) and sending the event messages. Much more taxing than a update (:updatePushedEvent)
 ]]
 function EventManager:pushEvent( target, userID )
-	if self.refreshing then return Logger.w "Ignoring request to force push remote -- a force push is already in progress" end
+	if self.refreshing then return Logger.w "Ignoring request to force push remote -- a force push is already in progress", 1 end
 	self.refreshing = true
 
 	local target = target or self.worker.cachedChannel
@@ -306,8 +305,7 @@ function EventManager:pushEvent( target, userID )
 
 	self:saveEvents()
 
-	Logger.s "Pushed event to target"
-	return true, message
+	return Logger.s "Pushed event to target"
 end
 
 --[[
@@ -315,10 +313,10 @@ end
 	@desc
 ]]
 function EventManager:updatePushedEvent()
-	if self.refreshing then return Logger.w "Ignoring request to update remote -- a force push is in progress" end
+	if self.refreshing then return report( 1, "Ignoring request to update remote -- a force push is in progress" ) end
 
 	local event, targetChannel = self:getPublishedEvent(), self.worker.cachedChannel
-	if not event then return Logger.f( "Cannot update pushed event: No event has been published!" ) end
+	if not event then return report( 2, "Failed to update pushed event because no event has been published" ) end
 
 	local poll = event.poll
 	if not ( event.pushedSnowflake and ( not poll or ( poll and poll.pushedSnowflake ) ) ) then
@@ -389,7 +387,7 @@ function EventManager:updatePushedEvent()
 	end
 
 	self:saveEvents()
-	Logger.s "Updated remote"
+	return Logger.s "Updated remote"
 end
 
 --[[
@@ -399,7 +397,7 @@ end
 function EventManager:pushPublishedEvent( target )
 	local pub = self:getPublishedEvent()
 	if not pub then
-		return Logger.e("Cannot push published event to target", "No event is published")
+		return report( 1, "Cannot push published event to target", "No event is published" )
 	end
 
 	self:pushEvent( target, pub.author )
@@ -423,10 +421,12 @@ function EventManager:refreshRemote( force )
 			wrap( self.updatePushedEvent, self )
 		end
 	else
-		local channel = Logger.assert( self.worker.cachedChannel, "Cannot push to remote -- channel has not been cached. Call refreshRemote AFTER starting worker", "Found cached channel" )
-		bulkDelete( channel )
+		wrap( function()
+			local channel = Logger.assert( self.worker.cachedChannel, "Cannot push to remote -- channel has not been cached. Call refreshRemote AFTER starting worker", "Found cached channel" )
+			bulkDelete( channel )
 
-		Reporter.info( channel, "No Event", "No one has published an event yet. Send this bot the message '!help' (via direct messaging, accessible by clicking the bots icon).\n\nThe bot will respond with helpful information regarding how to use the event planner." )
+			Reporter.info( channel, "No Event", "No one has published an event yet. Send this bot the message '!help' (via direct messaging, accessible by clicking the bots icon).\n\nThe bot will respond with helpful information regarding how to use the event planner." )
+		end )
 	end
 end
 
@@ -437,32 +437,33 @@ end
 function EventManager:updateEvent( userID, field, value )
 	local client = self.worker.client
 	local name = client:getUser( userID ).fullname
-	Logger.i("Attempting to update " .. name .. " event (field '"..tostring( field ) .. "', value '"..tostring( value ).."')")
+	Logger.i("Attempting to update " .. name, userID .. " event (field '"..tostring( field ) .. "', value '"..tostring( value ).."')")
 
 	local event = self:getEvent( userID )
 	if not event then
-		Logger.w( "No event exists for user " .. name, "Unable to edit fields on non-existent events... duh" )
-	else
-		event[ field ] = value
-		self:saveEvents( event )
+		return report( 1, "Refusing to edit field '"..field.."' for users ("..name..") event because the user doesn't own an event" )
+	end
 
-		if event.published then
-			Logger.i( "Notifying users that have RSVP'd to event that details have changed" )
-			local notif = "<@"..event.author.."> has changed the details of the published event. You are currently set to **%s**.\n\nChange your RSVP state using the reactions under the announcement message in BGnS"
+	event[ field ] = value
+	self:saveEvents( event )
 
-			local rsvps = event.responses
-			for userID, response in pairs( rsvps ) do
-				local user = client:getUser( userID )
-				Logger.d( "Notifying " .. user.fullname )
+	if event.published then
+		Logger.i( "Notifying users that have RSVP'd to event that details have changed" )
+		local notif = "<@"..event.author.."> has changed the details of the published event. You are currently set to **%s**.\n\nChange your RSVP state using the reactions under the announcement message in BGnS"
 
-				Reporter.info( user, "Event Plans Have Changed", notif:format( EventManager.ATTEND_ENUM[ response ] ) )
-			end
+		local rsvps = event.responses
+		for userID, response in pairs( rsvps ) do
+			local user = client:getUser( userID )
+			Logger.d( "Notifying " .. user.fullname )
 
-			self:refreshRemote()
+			Reporter.info( user, "Event Plans Have Changed", notif:format( EventManager.ATTEND_ENUM[ response ] ) )
 		end
 
-		return true
+		self:refreshRemote()
+		return Logger.s( "Updated event for user " .. name, "Members that RSVPd have been notified" )
 	end
+
+	return Logger.s( "Updated event for user " .. name )
 end
 
 --[[
@@ -470,6 +471,7 @@ end
 	@desc WIP
 ]]
 function EventManager:respondToEvent( userID, state )
+	--TODO: Rewrite this function (maybe)
 	local user, event = self.worker.client:getUser( userID ), self:getPublishedEvent()
 	if not event then
 		Reporter.warning( user, "Failed to RSVP", "No event is published -- can only RSVP to published events" )
@@ -506,11 +508,13 @@ end
 	@desc WIP
 ]]
 function EventManager:createPoll( userID )
-	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
+	local name, event = self.worker.client:getUser( userID ).fullname, self.events[ userID ]
+	Logger.i( "Creating poll for " .. name, userID )
+
 	if not event then
-		return Logger.e( "Failed to create poll. User " .. user.fullname, userID .. " has no event" )
+		return report( 1, "Refusing to create poll because user (" .. name .. ") doesn't own an event. An event is required to create a poll" )
 	elseif event.poll then
-		return Logger.e( "Refusing to create poll. User " .. user.fullname, userID .. " already has a poll" )
+		return report( 2, "Refusing to create poll because user (" .. name .. ") already has a poll" )
 	else
 		event.poll = {
 			responses = {},
@@ -518,12 +522,10 @@ function EventManager:createPoll( userID )
 			desc = "There is no description for this poll yet!"
 		}
 
-		self:saveEvents( event )
-		Logger.s( "Created poll for " .. user.fullname )
-
+		self:saveEvents( event.poll )
 		self:refreshRemote()
 
-		return true
+		return Logger.s( "Created poll for " .. name )
 	end
 end
 
@@ -532,20 +534,18 @@ end
 	@desc WIP
 ]]
 function EventManager:deletePoll( userID )
-	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
-	if not event then
-		return Logger.e( "Failed to delete poll. User " .. user.fullname, userID .. " has no event" )
-	elseif not event.poll then
-		return Logger.e( "Refusing to delete poll. User " .. user.fullname, userID .. " has no polls" )
+	local name, event = self.worker.client:getUser( userID ).fullname, self.events[ userID ]
+	Logger.i( "Deleting poll for " .. name, userID )
+
+	if not ( event and event.poll ) then
+		return report( event and 2 or 1, "Refusing to delete poll because user (" .. name .. ") has no " .. ( event and "poll" or "event" ) )
 	else
 		event.poll = nil
 
 		self:saveEvents()
-		Logger.s( "Deleted poll for " .. user.fullname )
-
 		self:refreshRemote( true )
 
-		return true
+		return Logger.s( "Deleted poll for " .. name )
 	end
 end
 
@@ -554,20 +554,18 @@ end
 	@desc WIP
 ]]
 function EventManager:setPollDesc( userID, desc )
-	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
-	if not event then
-		return Logger.e( "Failed to edit poll description. User " .. user.fullname, userID .. " has no event" )
-	elseif not event.poll then
-		return Logger.e( "Failed to edit poll. User " .. user.fullname, userID .. " has no poll" )
+	local name, event = self.worker.client:getUser( userID ).fullname, self.events[ userID ]
+	Logger.i( "Setting poll description for " .. name, userID )
+
+	if not ( event and event.poll ) then
+		return report( event and 2 or 1, "Refusing to set poll description because user ("..name..") has no " .. ( event and "poll" or "event" ) )
 	else
-		event.poll.desc = desc
+		event.poll.desc = desc or ""
 
 		self:saveEvents( event.poll )
-		Logger.s( "Edited poll desc for " .. user.fullname )
-
 		self:refreshRemote()
 
-		return true
+		return Logger.s( "Edited poll description for " .. name )
 	end
 end
 
@@ -576,22 +574,20 @@ end
 	@desc WIP
 ]]
 function EventManager:addPollOption( userID, option )
-	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
-	if not event then
-		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has no event" )
-	elseif not event.poll then
-		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has no poll" )
+	local name, event = self.worker.client:getUser( userID ).fullname, self.events[ userID ]
+	Logger.i( "Adding poll option for " .. name, userID )
+
+	if not ( event and event.poll ) then
+		return report( event and 2 or 1, "Refusing to add poll option because user ("..name..") has no " .. ( event and "poll" or "event" ) )
 	elseif #event.poll.choices >= 10 then
-		return Logger.e( "Failed to add poll option. User " .. user.fullname, userID .. " has reached the choice limit (10)" )
+		return report( 3, "Refusing to add poll option because user ("..name..") has reached the option limit (max. 10)" )
 	else
 		table.insert( event.poll.choices, option )
 
 		self:saveEvents( event.poll )
-		Logger.s( "Added poll option for " .. user.fullname )
-
 		self:refreshRemote()
 
-		return true, #event.poll.choices
+		return Logger.s( "Added poll option for " .. name )
 	end
 end
 
@@ -600,18 +596,16 @@ end
 	@desc WIP
 ]]
 function EventManager:removePollOption( userID, index )
+	local name, event = self.worker.client:getUser( userID ).fullname, self.events[ userID ]
+	Logger.i( "Removing poll option for " .. name, userID .. " at index " .. tostring( index ) )
+
 	index = tonumber( index )
 	if not index then
-		return Logger.e( "Failed to remove poll option. Index provided '" .. index .. "' is invalid. Provide a valid number" )
-	end
-
-	local user, event = self.worker.client:getUser( userID ), self.events[ userID ]
-	if not event then
-		return Logger.e( "Failed to remove poll option. User " .. user.fullname, userID .. " has no event" )
-	elseif not event.poll then
-		return Logger.e( "Failed to remove poll option. User " .. user.fullname, userID .. " has no poll" )
+		return report( 1, "Cannot remove poll option. Index provided '" .. tostring( index ) .. "' is invalid. Provide a valid number" )
+	elseif not ( event and event.poll ) then
+		return report( event and 3 or 2, "Refusing to remove poll option because user ("..name..") has no " .. ( event and "poll" or "event" ) )
 	elseif not event.poll.choices[ index ] then
-		return Logger.e( "Failed to remove poll option. There is no poll option #" .. index .. " in users event " .. user.fullname, userID )
+		return report( 4, "Cannot remove poll option because there is no poll option #" .. index .. " in users ("..name..") event" )
 	else
 		local val = table.remove( event.poll.choices, index )
 
@@ -625,11 +619,9 @@ function EventManager:removePollOption( userID, index )
 		end
 
 		self:saveEvents( event.poll )
-		Logger.s( "Removed poll option '"..val.."' ("..index..") for " .. user.fullname )
-
 		self:refreshRemote( true )
 
-		return true
+		return Logger.s( "Removed poll option for user " .. name )
 	end
 end
 
@@ -638,24 +630,20 @@ end
 	@desc
 ]]
 function EventManager:submitPollVote( userID, index )
-	index = tonumber( index )
-	if not index then
-		return Logger.e( "Failed to vote on poll option. Index provided '" .. index .. "' is invalid. Provide a valid number" )
-	end
+	local name, event = self.worker.client:getUser( userID ).fullname, self:getPublishedEvent()
+	Logger.i( "Submitting poll vote for " .. name, userID .. " for option " .. tostring( index ) )
 
-	local user, event = self.worker.client:getUser( userID ), self:getPublishedEvent()
-	if not ( event and event.poll ) then
-		return Logger.e( "Failed to vote on poll option. There is no published poll" )
-	elseif not event.poll.choices[ index ] then
-		return Logger.e( "Failed to vote on poll option. There is no poll option #" .. index )
+	index = tonumber( index )
+	if not ( index and event.poll.choices[ index ] ) then
+		return report( index and 2 or 1, "Cannot remove poll option. Index provided '" .. index .. "' is invalid. Provide a valid index that represents a present option" )
+	elseif not ( event and event.poll ) then
+		return report( event and 4 or 3, "Refusing to remove poll option because user ("..name..") has no " .. ( event and "poll" or "event" ) )
 	else
 		event.poll.responses[ userID ] = index
 		self:saveEvents( event.poll )
-		Logger.s( "Cast poll vote '"..event.poll.choices[ index ].."' ("..index..") for " .. user.fullname )
-
 		self:refreshRemote()
 
-		return true
+		return Logger.s( "Cast poll vote on option '"..event.poll.choices[ index ].."' ("..index..") for " .. name )
 	end
 end
 
