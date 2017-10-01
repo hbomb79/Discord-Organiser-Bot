@@ -140,7 +140,7 @@ commands = {
 		admin = true,
 		action = function( evManager ) return evManager:refreshRemote( true ) end,
 		onSuccess = function( evManager, user )
-			Reporter.success( message.author, "Remote refreshed", "The BGnS server has been refreshed to show most recent information" )
+			Reporter.success( user, "Remote refreshed", "The BGnS server has been refreshed to show most recent information" )
 		end,
 		onFailure = function( evManager, user, message, output )
 			Reporter.warning( user, "Failed to refresh remote", output )

@@ -428,6 +428,8 @@ function EventManager:refreshRemote( force )
 			Reporter.info( channel, "No Event", "No one has published an event yet. Send this bot the message '!help' (via direct messaging, accessible by clicking the bots icon).\n\nThe bot will respond with helpful information regarding how to use the event planner." )
 		end )
 	end
+
+	return true
 end
 
 --[[
