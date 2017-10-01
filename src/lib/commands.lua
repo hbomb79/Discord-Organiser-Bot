@@ -151,7 +151,7 @@ commands = {
 		help = "Forces the bot to unpublish the currently published event. The event host will be notified. It is suggested that troublesome users be banned using **!banUser**.",
 		admin = true,
 		action = function( evManager, user, message )
-			local userID = user.id
+			local userID, worker = user.id, evManager.worker
 			Logger.i( "Revoking remote for " .. user.fullname, userID )
 
 			local ev = evManager:getPublishedEvent()
