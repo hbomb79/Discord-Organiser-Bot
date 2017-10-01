@@ -4,7 +4,7 @@ local Logger = require "src.client.Logger"
 local Worker = require "src.client.Worker"
 local discordia = luvitRequire "discordia"
 
-local wrap = function( f ) return coroutine.wrap( f )() end
+local wrap = function( f, ... ) return coroutine.wrap( f )( ... ) end
 
 local function bulkDelete( channel )
 	local msgs = channel:getMessages()
@@ -418,9 +418,9 @@ function EventManager:refreshRemote( force )
 				Logger.w("Force refresh is occurring at the same time as an update of the remote. This could easily cause server NOT FOUND (404) responses (due to the message being overwritten)", "The responses can be ignored, however running a force refresh at the same time as an update should be avoided if possible" )
 			end
 
-			self:pushPublishedEvent()
+			wrap( self.pushPublishedEvent, self )
 		else
-			self:updatePushedEvent()
+			wrap( self.updatePushedEvent, self )
 		end
 	else
 		local channel = Logger.assert( self.worker.cachedChannel, "Cannot push to remote -- channel has not been cached. Call refreshRemote AFTER starting worker", "Found cached channel" )
