@@ -4,7 +4,7 @@ local Logger = require "src.client.Logger"
 local Worker = require "src.client.Worker"
 local discordia = luvitRequire "discordia"
 
-local wrap = function( f, ... ) return coroutine.wrap( f )( ... ) end
+local wrap, EventManager = function( f, ... ) return coroutine.wrap( f )( ... ) end
 
 local function bulkDelete( channel )
 	local msgs = channel:getMessages()
@@ -106,7 +106,7 @@ end
 ]]
 
 Logger.d "Compiling EventManager"
-local EventManager = class "EventManager" {
+EventManager = class "EventManager" {
 	static = {
 		ATTEND_ENUM = { [ 0 ] = "not going", [ 1 ] = "might be going", [ 2 ] = "going" },
 		CHOICE_REACTIONS = { "1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟" },
