@@ -5,7 +5,6 @@ local Worker = require "src.client.Worker"
 local discordia = luvitRequire "discordia"
 
 local wrap = function( f ) return coroutine.wrap( f )() end
-local function nilToEmptyString( val ) return val == nil and "" or val end
 
 local function bulkDelete( channel )
 	local msgs = channel:getMessages()
@@ -145,6 +144,15 @@ end
 	@instance
 	@desc WIP
 ]]
+function EventManager:saveEvents( event )
+	if event then event.updated = true end
+	JSONPersist.saveToFile( ".events", self.events )
+end
+
+--[[
+	@instance
+	@desc WIP
+]]
 function EventManager:createEvent( userID )
 	local name = self.worker.client:getUser( userID ).fullname
 	Logger.i( "Creating event for " .. name )
@@ -168,7 +176,7 @@ function EventManager:createEvent( userID )
 		published = false;
 	}
 
-	JSONPersist.saveToFile( ".events", self.events )
+	self:saveEvents( event )
 	Logger.s( "Created and saved event for " .. name .. " ["..userID.."]" )
 
 	return true
@@ -195,7 +203,7 @@ function EventManager:removeEvent( userID, noUnpublish )
 	end
 
 	self.events[ userID ] = nil
-	JSONPersist.saveToFile( ".events", self.events )
+	self:saveEvents()
 	Logger.s( "Removed event for " .. name .. " ["..userID.."]" )
 
 	return true
@@ -217,7 +225,7 @@ function EventManager:publishEvent( userID )
 	end
 
 	event.published = true
-	JSONPersist.saveToFile( ".events", self.events )
+	self:saveEvents( event )
 	Logger.s( "Published event for " .. name .. " ["..userID.."]" )
 
 	self:refreshRemote()
@@ -241,10 +249,10 @@ function EventManager:unpublishEvent()
 	publishedEvent.published = false
 	publishedEvent.pushedSnowflake = nil
 
-	JSONPersist.saveToFile( ".events", self.events )
+	self:saveEvents()
 	Logger.s( "Unpublished event for " .. name .. " ["..publishedEvent.author.."]" )
 
-	self:refreshRemote()
+	self:refreshRemote( true )
 
 	return true
 end
@@ -273,9 +281,8 @@ function EventManager:pushEvent( target, userID )
 	if event.published then
 		Logger.d "Updating .events file to hold correct event snowflake under published event"
 		event.pushedSnowflake = message.id
-		if poll then poll.pushedSnowflake = pollMessage.id end
-
-		JSONPersist.saveToFile( ".events", self.events )
+		event.updated = false
+		if poll then poll.pushedSnowflake = pollMessage.id; poll.updated = false end
 
 		wrap( function()
 			Logger.d "Adding message reactions for RSVPs"
@@ -296,6 +303,8 @@ function EventManager:pushEvent( target, userID )
 	else
 		self.refreshing = false
 	end
+
+	self:saveEvents()
 
 	Logger.s "Pushed event to target"
 	return true, message
@@ -323,86 +332,64 @@ function EventManager:updatePushedEvent()
 		return self:pushPublishedEvent()
 	end
 
-	if not self.refreshingEvent then
-		local eventReactions, VALID_REACTIONS, updateEvent = eventMessage.reactions, { Worker.ATTEND_YES_REACTION, Worker.ATTEND_MAYBE_REACTION, Worker.ATTEND_NO_REACTION }
-		for r = 1, #VALID_REACTIONS do
-			local reaction = eventReactions:get( VALID_REACTIONS[ r ] )
+	local function fixReactions( message, validReactions, forLimit )
+		local hadToFix = false
+		for r = 1, forLimit or #validReactions do
+			local reaction = message.reactions:get( validReactions[ r ] )
+			if not reaction then
+				if not message:addReaction( validReactions[ r ] ) then
+					Logger.e("Failed to add reaction " .. validReactions[ r ] .. " to event message. Force pushing to remote")
+					return self:pushPublishedEvent()
+				end
 
-			if not reaction or reaction.count > 1 then
-				-- A user has RSVPd OR a member has deleted a reaction. Clear reactions, re populate and update message to show up-to-date RSVPs.
-				Logger.d( "Detected a change in reaction count on event message. Refreshing event reactions and message" )
-				updateEvent = true
+				hadToFix = true
+			elseif reaction.count > 1 then
+				wrap( function()
+					for user in reaction:getUsers():iter() do
+						if user.id ~= "361038817840332800" then reaction:delete( user.id ) end
+					end
+				end )
 
-				break
+				hadToFix = true
 			end
 		end
 
-		local embed = eventMessage.embeds[ 1 ]
-		updateEvent = updateEvent or ( nilToEmptyString( embed.title ) ~= event.title or nilToEmptyString( embed.description ) ~= event.desc or nilToEmptyString( embed.fields[ 1 ].value ) ~= event.location or nilToEmptyString( embed.fields[ 2 ].value ) ~= event.timeframe )
+		return hadToFix
+	end
 
-		if updateEvent then
-			self.refreshingEvent = true
-			Logger.d "Updating event message as it is out of sync with the local machine"
+	local updated = event.updated
+	if fixReactions( eventMessage, { Worker.ATTEND_YES_REACTION, Worker.ATTEND_MAYBE_REACTION, Worker.ATTEND_NO_REACTION } ) or event.updated then
+		Logger.d "Updating event message content. Event has been updated since last push"
+		event.updated = false
 
-			local status = eventMessage:setEmbed( generateEmbed( event, self.worker ) )
-			if not status then
-				Logger.e( "Failed to update event message! Force pushing to remote." )
-				return self:pushPublishedEvent()
-			end
-
-			Logger.d "Adding message reactions for RSVPs"
-
-			waitForEvent = true
-			wrap( function()
-				eventMessage:clearReactions()
-				for i = 1, #VALID_REACTIONS do if not eventMessage:addReaction( VALID_REACTIONS[ i ] ) then Logger.e("Failed to add reaction to event message during UPDATE. Initiating FORCE push"); self:pushPublishedEvent(); break end end
-
-				Logger.d "Asynchronous push of reactions for event message complete."
-				self.refreshingEvent = false
-			end )
-
-			Logger.s "Updated main event information"
+		local status = eventMessage:setEmbed( generateEmbed( event, self.worker ) )
+		if not status then
+			Logger.e( "Failed to update event message! Force pushing to remote." )
+			return self:pushPublishedEvent()
 		end
-	else Logger.d("Refusing to update event message -- already being updated") end
+	end
 
-	if poll and not self.refreshingPoll then
+	if poll then
 		local pollMessage = targetChannel:getMessage( poll.pushedSnowflake )
 		if not pollMessage then
 			Logger.w( "Unable to update pushed event! Snowflake information is invalid for poll message (messages removed or never pushed).", tostring( pollMessage ) )
 			return self:pushPublishedEvent()
 		end
 
-		local pollReactions, VALID_POLL_REACTIONS = pollMessage.reactions, EventManager.CHOICE_REACTIONS
-		for p = 1, #poll.choices do
-			local reaction = pollReactions:get( VALID_POLL_REACTIONS[ p ] )
-			if not reaction or reaction.count > 1 then
-				self.refreshingPoll = true
-				Logger.d( "Detected a change in reaction count on poll message.", tostring( not reaction ), tostring( reaction and reaction.count or 'cannot count' ), tostring( reaction.emojiName ) )
-				local status = pollMessage:setEmbed( generateEmbed( event, self.worker, true ) )
+		if fixReactions( pollMessage, EventManager.CHOICE_REACTIONS, #poll.choices ) or poll.updated then
+			Logger.d "Updating poll message content. Poll has been updated since last push"
+			poll.updated = false
 
-				if not status then
-					Logger.e( "Failed to update poll message! Force pushing to remote." )
-					return self:pushPublishedEvent()
-				end
-
-				Logger.d "Adding message reactions for poll votes"
-				waitForPoll = true
-				wrap( function()
-					pollMessage:clearReactions()
-					for i = 1, #poll.choices do if not pollMessage:addReaction( EventManager.CHOICE_REACTIONS[ i ] ) then Logger.e("Failed to add reaction to poll message during UPDATE. Initiating FORCE push"); self:pushPublishedEvent(); break end end
-
-					Logger.d "Asynchronous push of reactions for poll message complete."
-					self.refreshingPoll = false
-				end )
-
-				Logger.s "Updated poll information"
-				break
+			local status = pollMessage:setEmbed( generateEmbed( event, self.worker, true ) )
+			if not status then
+				Logger.e( "Failed to update poll message! Force pushing to remote." )
+				return self:pushPublishedEvent()
 			end
 		end
-	else Logger.d("Refusing to update poll message -- already being updated") end
+	end
 
-	JSONPersist.saveToFile( ".events", self.events )
-	Logger.s( "Updated remote", ( ( self.refreshingPoll or self.refreshingEvent ) and "Refreshes may still be running asynchronously" or "No need to edit remote" ) )
+	self:saveEvents()
+	Logger.s "Updated remote"
 end
 
 --[[
@@ -457,7 +444,7 @@ function EventManager:updateEvent( userID, field, value )
 		Logger.w( "No event exists for user " .. name, "Unable to edit fields on non-existent events... duh" )
 	else
 		event[ field ] = value
-		JSONPersist.saveToFile( ".events", self.events )
+		self:saveEvents( event )
 
 		if event.published then
 			Logger.i( "Notifying users that have RSVP'd to event that details have changed" )
@@ -502,7 +489,7 @@ function EventManager:respondToEvent( userID, state )
 		Logger.w( "Refusing to respond to event -- user has already set RSVP state to " .. state )
 	else
 		event.responses[ userID ] = state
-		JSONPersist.saveToFile( ".events", self.events )
+		self:saveEvents( event )
 
 		Logger.i( "Notifying event host of new RSVP" )
 		Reporter.info( eventAuthor, "A user has RSVP'd", "<@"..userID.."> has set their RSVP status to **"..stateName.."**" )
@@ -531,7 +518,7 @@ function EventManager:createPoll( userID )
 			desc = "There is no description for this poll yet!"
 		}
 
-		JSONPersist.saveToFile( ".events", self.events )
+		self:saveEvents( event )
 		Logger.s( "Created poll for " .. user.fullname )
 
 		self:refreshRemote()
@@ -553,7 +540,7 @@ function EventManager:deletePoll( userID )
 	else
 		event.poll = nil
 
-		JSONPersist.saveToFile( ".events", self.events )
+		self:saveEvents()
 		Logger.s( "Deleted poll for " .. user.fullname )
 
 		self:refreshRemote( true )
@@ -575,7 +562,7 @@ function EventManager:setPollDesc( userID, desc )
 	else
 		event.poll.desc = desc
 
-		JSONPersist.saveToFile( ".events", self.events )
+		self:saveEvents( event.poll )
 		Logger.s( "Edited poll desc for " .. user.fullname )
 
 		self:refreshRemote()
@@ -599,7 +586,7 @@ function EventManager:addPollOption( userID, option )
 	else
 		table.insert( event.poll.choices, option )
 
-		JSONPersist.saveToFile( ".events", self.events )
+		self:saveEvents( event.poll )
 		Logger.s( "Added poll option for " .. user.fullname )
 
 		self:refreshRemote()
@@ -637,7 +624,7 @@ function EventManager:removePollOption( userID, index )
 			elseif choice > index then event.poll.responses[ user ] = choice - 1 end
 		end
 
-		JSONPersist.saveToFile( ".events", self.events )
+		self:saveEvents( event.poll )
 		Logger.s( "Removed poll option '"..val.."' ("..index..") for " .. user.fullname )
 
 		self:refreshRemote( true )
@@ -663,7 +650,7 @@ function EventManager:submitPollVote( userID, index )
 		return Logger.e( "Failed to vote on poll option. There is no poll option #" .. index )
 	else
 		event.poll.responses[ userID ] = index
-		JSONPersist.saveToFile( ".events", self.events )
+		self:saveEvents( event.poll )
 		Logger.s( "Cast poll vote '"..event.poll.choices[ index ].."' ("..index..") for " .. user.fullname )
 
 		self:refreshRemote()

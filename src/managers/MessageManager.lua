@@ -108,6 +108,12 @@ function MessageManager:handleNewReaction( reaction, userID )
 	local events, message = self.worker.eventManager, reaction.message
 
 	local event = events:getPublishedEvent()
+	if events.refreshing or events.refreshingPoll or events.refreshingEvent then
+		reaction:delete( userID )
+		Logger.w( "Ignoring reaction -- Refresh is in progress, refusing to process reaction added on constructing message" )
+		return Reporter.failure( self.worker.client:getUser( userID ), "Refusing to process reaction", "Your attempt to respond to a message using a reaction was rejected because the reactions were still being added to the message. Please remove and re-add your reaction in a short while." )
+	end
+
 	if not ( event and event.pushedSnowflake ) then return
 	elseif message.id == event.pushedSnowflake then
 		Logger.i "Submitting attendee status via reaction"

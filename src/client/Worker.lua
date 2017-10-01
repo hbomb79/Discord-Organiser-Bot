@@ -76,7 +76,7 @@ function Worker:start()
 	Logger.s "Fetching guild and channel information"
 
 	self.client:on( "messageCreate", function( message ) self.messageManager:handleInbound( message ) end )
-	self.client:on( "reactionAdd", function( ... ) self.messageManager:handleNewReaction( ... ) end)
+	self.client:on( "reactionAdd", function( ... ) self.messageManager:handleNewReaction( ... ) end )
 	self.alive = true
 	Logger.s "Worker ready -- waiting for messages"
 
