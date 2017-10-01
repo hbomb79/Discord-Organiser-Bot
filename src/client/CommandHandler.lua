@@ -110,7 +110,6 @@ function CommandHandler:handleCommand( message, command )
 	local commandName, arg = command:match "^%!(%w+)%s*(.*)$"
 
 	local cmd = CommandHandler.static.commands[ commandName ]
-
 	if cmd.admin then
 		Logger.i( "Validating user admin level in order to execute '" .. commandName .. "' command." )
 		if not self.worker:getAdminLevel( message.author.id ) then
