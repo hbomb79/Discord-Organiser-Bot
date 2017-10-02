@@ -6,15 +6,6 @@ local discordia = luvitRequire "discordia"
 
 local wrap, EventManager = function( f, ... ) return coroutine.wrap( f )( ... ) end
 
-local function bulkDelete( channel )
-	local msgs = channel:getMessages()
-	if #msgs > 1 then
-		channel:bulkDelete( msgs )
-	elseif #msgs == 1 then
-		msgs:iter()():delete()
-	end
-end
-
 local function formResponses( client, responses )
 	local lastState, str, states = false, "", { {}, {}, {} }
 	for userID, response in pairs( responses ) do table.insert( states[ response + 1 ], userID ) end
@@ -268,7 +259,7 @@ function EventManager:pushEvent( target, userID )
 	Logger.i( "Pushing event to target chat ("..tostring( target )..")" )
 
 	local event = self.events[ userID ]
-	if target == self.worker.cachedChannel then bulkDelete( target ) end
+	if target == self.worker.cachedChannel then target:bulkDelete( target.messages ) end
 
 	local message = Logger.assert( target:send { embed = generateEmbed( event, self.worker ) }, "Failed to push remote. Cannot continue", "Remote pushed" )
 	local poll, pollMessage = event.poll
@@ -423,7 +414,7 @@ function EventManager:refreshRemote( force )
 	else
 		wrap( function()
 			local channel = Logger.assert( self.worker.cachedChannel, "Cannot push to remote -- channel has not been cached. Call refreshRemote AFTER starting worker", "Found cached channel" )
-			bulkDelete( channel )
+			channel:bulkDelete( channel.messages )
 
 			Reporter.info( channel, "No Event", "No one has published an event yet. Send this bot the message '!help' (via direct messaging, accessible by clicking the bots icon).\n\nThe bot will respond with helpful information regarding how to use the event planner." )
 		end )
