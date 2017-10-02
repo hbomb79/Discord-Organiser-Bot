@@ -259,7 +259,7 @@ function EventManager:pushEvent( target, userID )
 	Logger.i( "Pushing event to target chat ("..tostring( target )..")" )
 
 	local event = self.events[ userID ]
-	if target == self.worker.cachedChannel then target:bulkDelete( target.messages ) end
+	if target == self.worker.cachedChannel then target:bulkDelete( target:getMessages() ) end
 
 	local message = Logger.assert( target:send { embed = generateEmbed( event, self.worker ) }, "Failed to push remote. Cannot continue", "Remote pushed" )
 	local poll, pollMessage = event.poll
@@ -414,7 +414,7 @@ function EventManager:refreshRemote( force )
 	else
 		wrap( function()
 			local channel = Logger.assert( self.worker.cachedChannel, "Cannot push to remote -- channel has not been cached. Call refreshRemote AFTER starting worker", "Found cached channel" )
-			channel:bulkDelete( channel.messages )
+			channel:bulkDelete( channel:getMessages() )
 
 			Reporter.info( channel, "No Event", "No one has published an event yet. Send this bot the message '!help' (via direct messaging, accessible by clicking the bots icon).\n\nThe bot will respond with helpful information regarding how to use the event planner." )
 		end )
