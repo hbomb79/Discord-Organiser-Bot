@@ -61,15 +61,8 @@ function MessageManager:handleInbound( message )
 	if not self.owner then
 		-- Cannot process message if we have no owner/worker
 		return Logger.w("No owner bound to this manager instance (MessageManager). Cannot continue -- ignoring message")
-	elseif message.author.bot or self.restrictionManager:isUserBanned( uID ) then
-		-- Ignore banned user/bot messages
+	elseif message.author.bot or self.restrictionManager:isUserBanned( uID ) or message.channel.type ~= discordia.enums.channelType.private then
 		return
-	end
-
-	-- Check that message came from a private channel
-	Logger.i( "Handling inbound message with content: " .. tostring( message.content ) .. ", from: " .. message.author.fullname .. ", via channel: " .. tostring( message.channel ) .. " @ " .. tostring( message.channel.name ) .. ". Channel type: " .. tostring( message.channel.type ) )
-	if message.channel.type ~= discordia.enums.channelType.private then
-		return Logger.w( "Message recieved from public source", tostring( message.channel ), "Commands issued to bot must be sent via a direct message" )
 	elseif self.restrictionManager:isUserRestricted( uID ) then
 		-- User is restricted. Add one violation and ignore
 		Logger.w( "Received message from " .. message.author.fullname, "This user is restricted! Adding one violation" )

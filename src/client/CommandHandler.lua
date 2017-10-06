@@ -90,10 +90,6 @@ function CommandHandler:executeCommand( commandName, message, commandArg )
 	Logger.i( "Executing action for command '" .. commandName .. "'" )
 	local events, user = self.worker.eventManager, message.author
 	local ok, reason, code = com.action( events, user, message, commandArg )
-	print( tostring( ok ) )
-	print( tostring( reason ) )
-	print( tostring( code ) )
-
 	if ok then Logger.s( "Executed command -- invoking 'onSuccess'" ) else Logger.e( "Command execution failed gracefully -- invoking 'onFailure'") end
 
 	local cb = com[ "on" .. ( ok and "Success" or "Failure" ) ]
