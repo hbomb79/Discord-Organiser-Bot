@@ -60,7 +60,7 @@ function Logger.static.assert( v, failureMessage, successMessage, worker )
 		local worker, m = ( Class.typeOf( worker, "Worker", true ) and worker.alive and worker ) or ( Logger.static.worker and Logger.static.worker.alive and Logger.static.worker )
 		if worker then m = Logger.f else m = error end
 
-		m("Failed to assert '"..tostring( v ).."'" .. " | " .. ( failureMessage or "" ) .. " | " .. ( worker and "Attempting to gracefully close Discordapp gateway (via worker directly -- killing)" or "No worker directly accessible. Cannot gracfully close -- forcing termination" ) )
+		m("Failed to assert '"..tostring( v ).."'" .. " | " .. ( failureMessage or "" ) .. " | " .. ( worker and "Attempting to gracefully close DiscordApp gateway (via worker directly -- killing)" or "No worker directly accessible. Cannot gracfully close -- forcing termination" ) )
 		
 		if worker then worker:kill() end
 	else

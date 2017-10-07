@@ -25,6 +25,7 @@ local Worker = class "Worker" {
 
 	queue = {};
 	guilds = {};
+	userCommandRequests = {};
 }
 
 --[[
@@ -67,7 +68,19 @@ end
 ]]
 function Worker:start()
 	self.client:on( "reactionAdd", function( reaction, userID ) self.messageManager:handleInboundReaction( reaction, userID ) end ) 
-	self.client:on( "messageCreate", function( message ) self.messageManager:handleInboundMessage( message ) end ) 
+	self.client:on( "messageCreate", function( message )
+		if message.author.bot then return end
+		
+		local reqs = self.userCommandRequests[ message.author.id ] or 0
+		if reqs >= 3 then
+			return Logger.w( "User " .. message.author.fullname .. " already has 3 or more requests in the queue -- ignoring message" )
+		end
+
+		Logger.i( "Inserting message into queue at position #" .. #self.queue + 1, "User " .. message.author.fullname .. " now has " .. reqs + 1 .. " request(s) in the queue" )
+		self.userCommandRequests[ message.author.id ] = reqs + 1
+
+		self:addToQueue( message )
+	end )
 	self.client:on( "guildCreate", function( guild ) self:handleNewGuild( guild ) end )
 
 	self.alive = true
@@ -124,12 +137,14 @@ end
 	@return <boolean - success>
 ]]
 function Worker:addToQueue( target, userID )
-	if discordia.class.isInstance( target, "Message" ) then
+	if discordia.class.isInstance( target, discordia.class.classes.Message ) then
 		table.insert( self.queue, target )
-	elseif discordia.class.isInstance( target, "Reaction" ) then
+	elseif discordia.class.isInstance( target, discordia.class.classes.Reaction ) then
 		if not userID then return Logger.w( "Cannot add Reaction to worker queue because no userID was provided (arg #2)" ) end
 
-		table.insert( self.queue, { target, userID } )
+		-- table.insert( self.queue, { target, userID } )
+		print "Cannot add reaction based commands to queue; NYI"
+		return false
 	else
 		return Logger.w( "Unknown target '"..tostring( target ).."' for worker queue" )
 	end
@@ -144,13 +159,16 @@ end
 ]]
 function Worker:checkQueue()
 	local queue = self.queue
-	if #queue == 0 then return end
+	if #queue == 0 or self.working then return end
 
 	Logger.i( "Starting queue in order to process items (" .. #queue .. ")" )
+	self.working = true
 	while #queue > 0 do
 		local item = queue[ 1 ]
 		--TODO
 	end
+
+	self.working = false
 end
 
 --[[
