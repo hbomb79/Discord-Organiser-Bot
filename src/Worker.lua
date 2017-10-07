@@ -43,7 +43,7 @@ function Worker:__init__( ... )
 	self:resolve( ... )
 
 	Logger.bindActiveWorker( self )
-	self.messageManager = self:bindManager( require "src.manager.MessageManager" )
+	--TODO: self.messageManager = self:bindManager( require "src.manager.MessageManager" )
 	--TODO: self.userManager = self:bindManager( require "src.manager.UserManager" )
 
 	self.client = Logger.assert( discordia.Client( self.clientOptions ), "Failed to instantiate Discordia client", "Discordia client opening" )
@@ -69,7 +69,7 @@ end
 function Worker:start()
 	self.client:on( "reactionAdd", function( reaction, userID ) self.messageManager:handleInboundReaction( reaction, userID ) end ) 
 	self.client:on( "messageCreate", function( message )
-		if message.author.bot then return end
+		if message.author.bot or not ( message.guild and self.guilds[ message.guild ] ) then return Logger.w( "Message from foreign origin (could be bot, private DM, or foreign guild)" ) end
 		
 		local reqs = self.userCommandRequests[ message.author.id ] or 0
 		if reqs >= 3 then
