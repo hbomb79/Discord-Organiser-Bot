@@ -73,7 +73,7 @@ end
 	@static
 	@desc WIP
 ]]
-function Logger.static.bind( worker )
+function Logger.static.bindActiveWorker( worker )
 	if Logger.static.worker and Logger.static.worker.alive then
 		Logger.e("Failed to bind Logger to worker instance '"..tostring( worker ).."'. This is because a worker is already bound to this Logger (and is still active).", "Kill the active worker before re-attempting to bind again.")
 	elseif not Class.typeOf( worker, "Worker", true ) then
