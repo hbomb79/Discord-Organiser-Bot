@@ -21,7 +21,7 @@ local discordia = luvitRequire "discordia"
 assert( discordia, "Failed to bootstrap: Discordia failed to load" )
 
 -- Store the class API in the 'Class' global
-Class = require "src.lib.class"
+local Class = require "src.lib.class"
 assert( type( class ) == "function" and type( Class ) == "table" and abstract and mixin and extends, "Failed to bootstrap: Class library references could not be found" )
 
 local Logger = require "src.util.Logger"
