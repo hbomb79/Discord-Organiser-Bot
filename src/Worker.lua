@@ -1,6 +1,5 @@
 local Logger = require "src.util.Logger"
 local discordia = luvitRequire "discordia"
-local class = discordia.class
 
 --[[
 	@instance client - Discord Client Instance (def. false) - The Discordia client object used by the bot, created at instantiation. Shouldn't be manually edited as `client` is used internally.
@@ -101,7 +100,7 @@ end
 		  entry for the guild and save the config.
 ]]
 function Worker:handleNewGuild( guild )
-	if not class.isInstance( guild, "Guild" ) then
+	if not discordia.class.isInstance( guild, "Guild" ) then
 		return Logger.w( "Invalid guild instance '"..tostring( guild ).."' provided to Worker:handleNewGuild. Ensure the argument is a valid Guild instance" )
 	end
 
@@ -125,9 +124,9 @@ end
 	@return <boolean - success>
 ]]
 function Worker:addToQueue( target, userID )
-	if class.isInstance( target, "Message" ) then
+	if discordia.class.isInstance( target, "Message" ) then
 		table.insert( self.queue, target )
-	elseif class.isInstance( target, "Reaction" ) then
+	elseif discordia.class.isInstance( target, "Reaction" ) then
 		if not userID then return Logger.w( "Cannot add Reaction to worker queue because no userID was provided (arg #2)" ) end
 
 		table.insert( self.queue, { target, userID } )
