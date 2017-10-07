@@ -61,15 +61,8 @@ function MessageManager:handleInbound( message )
 	if not self.owner then
 		-- Cannot process message if we have no owner/worker
 		return Logger.w("No owner bound to this manager instance (MessageManager). Cannot continue -- ignoring message")
-	elseif message.author.bot or self.restrictionManager:isUserBanned( uID ) then
-		-- Ignore banned user/bot messages
+	elseif message.author.bot or self.restrictionManager:isUserBanned( uID ) or message.channel.type ~= discordia.enums.channelType.private then
 		return
-	end
-
-	-- Check that message came from a private channel
-	Logger.i( "Handling inbound message with content: " .. tostring( message.content ) .. ", from: " .. message.author.fullname .. ", via channel: " .. tostring( message.channel ) .. " @ " .. tostring( message.channel.name ) .. ". Channel type: " .. tostring( message.channel.type ) )
-	if message.channel.type ~= discordia.enums.channelType.private then
-		return Logger.w( "Message recieved from public source", tostring( message.channel ), "Commands issued to bot must be sent via a direct message" )
 	elseif self.restrictionManager:isUserRestricted( uID ) then
 		-- User is restricted. Add one violation and ignore
 		Logger.w( "Received message from " .. message.author.fullname, "This user is restricted! Adding one violation" )
@@ -93,8 +86,11 @@ function MessageManager:setPromptMode( userID, mode )
 		return Logger.w("Failed to set prompt mode for user " .. userID .. ". User ID invalid.")
 	end
 
+	local previousMode = self.promptModes[ userID ]
 	self.promptModes[ userID ] = mode
-	user:send( mode and CommandHandler.PROMPT_MODE_HELP[ mode ] .. " -- __or__ use **!skip** to move on, or use **!skipall** to leave prompt mode" or "**Prompt mode exited** -- commands can be entered normally." )
+
+	if previousMode == mode and not mode then return end
+	coroutine.wrap( user.send )( user, mode and CommandHandler.PROMPT_MODE_HELP[ mode ] .. " -- __or__ use **!skip** to move on, or use **!skipall** to leave prompt mode" or "**Prompt mode exited** -- commands can be entered normally." )
 
 	Logger.s( "Notified " .. user.fullname .. " that they are " .. ( mode and "in prompt mode" or "no longer in prompt mode" ), select( 2, pcall( error, "hit", 4 ) ) )
 end
