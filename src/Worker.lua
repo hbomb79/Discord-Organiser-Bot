@@ -161,6 +161,17 @@ function Worker:saveGuilds()
 	JSONPersist.saveToFile( self.guildPath, self.guilds )	
 end
 
+--[[
+	@instance
+	@desc Binds the manager class provided by creating an instance of it
+		  and setting it's worker to the 'self' object (this worker instance).
+]]
+function Worker:bindManager( managerClass, ... )
+	Logger.assert( Class.typeOf( managerClass, "Manager" ), "Failed to bind manager '"..tostring( managerClass ).."' to worker because the manager class provided is NOT a class derived from 'Manager'", "Class provided is valid -- binding" )
+
+	return managerClass( self, ... )
+end
+
 configureConstructor {
 	orderedArguments = { "clientOptions", "tokenPath" },
 	argumentTypes = {
