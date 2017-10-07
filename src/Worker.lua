@@ -1,4 +1,4 @@
-local Logger = require "src.util.Logger"
+local Logger, Class = require "src.util.Logger", require "src.lib.class"
 local discordia = luvitRequire "discordia"
 
 --[[
