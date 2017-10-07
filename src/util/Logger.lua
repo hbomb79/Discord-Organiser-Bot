@@ -85,7 +85,7 @@ function Logger.static.bindActiveWorker( worker )
 	end
 end
 
--- Dynamically generate a log function for each mode (name of the function is the first character of the mode in lowercase. IE: The function for mode 'WANRING' is 'Logger.w')
+-- Dynamically generate a log function for each mode (name of the function is the first character of the mode in lowercase. IE: The function for mode 'WARNING' is 'Logger.w')
 for k in pairs( Logger.static.modes ) do
 	Logger.static[ k:sub( 1, 1 ):lower() ] = function( ... )
 		Logger.static.out( k, ... )
