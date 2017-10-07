@@ -42,8 +42,8 @@ function Worker:__init__( ... )
 	self:resolve( ... )
 
 	Logger.bindActiveWorker( self )
-	self:bindManager( require "src.manager.MessageManager" )
-	self:bindManager( require "src.manager.UserManager" )
+	self.messageManager = self:bindManager( require "src.manager.MessageManager" )
+	--TODO: self.userManager = self:bindManager( require "src.manager.UserManager" )
 
 	self.client = Logger.assert( discordia.Client( self.clientOptions ), "Failed to instantiate Discordia client", "Discordia client opening" )
 
