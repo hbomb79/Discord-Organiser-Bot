@@ -179,3 +179,5 @@ configureConstructor {
 		tokenPath = "string"
 	}
 }
+
+return Worker:compile()
