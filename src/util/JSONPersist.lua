@@ -1,4 +1,4 @@
-local Logger = require "src.client.Logger"
+local Logger = require "src.util.Logger"
 local json = luvitRequire "json"
 
 --[[

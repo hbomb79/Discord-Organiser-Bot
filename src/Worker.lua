@@ -1,4 +1,4 @@
-local Logger, Class = require "src.util.Logger", require "src.lib.class"
+local Logger, Class, JSONPersist = require "src.util.Logger", require "src.lib.class", require "src.util.JSONPersist"
 local discordia = luvitRequire "discordia"
 
 --[[
@@ -47,6 +47,7 @@ function Worker:__init__( ... )
 	--TODO: self.userManager = self:bindManager( require "src.manager.UserManager" )
 
 	self.client = Logger.assert( discordia.Client( self.clientOptions ), "Failed to instantiate Discordia client", "Discordia client opening" )
+	self.guilds = Logger.assert( JSONPersist.loadFromFile( self.guildPath ), "Failed to load guild information", "Guilds loaded" )
 
 	local h = io.open( self.tokenPath )
 	Logger.assert( h, "Failed to open token information", "Token information loaded" )
@@ -67,10 +68,10 @@ end
 	@desc Finishes the construction of the Worker instance by creating the remaining event listeners
 ]]
 function Worker:start()
-	self.client:on( "reactionAdd", function( reaction, userID ) self.messageManager:handleInboundReaction( reaction, userID ) end ) 
+	-- self.client:on( "reactionAdd", function( reaction, userID ) self.messageManager:handleInboundReaction( reaction, userID ) end )
 	self.client:on( "messageCreate", function( message )
-		if message.author.bot or not ( message.guild and self.guilds[ message.guild ] ) then return Logger.w( "Message from foreign origin (could be bot, private DM, or foreign guild)" ) end
-		
+		if message.author.bot or not ( message.guild and self.guilds[ message.guild.id ] ) then return Logger.w( "Message from foreign origin (could be bot, private DM, or foreign guild)" ) end
+
 		local reqs = self.userCommandRequests[ message.author.id ] or 0
 		if reqs >= 3 then
 			return Logger.w( "User " .. message.author.fullname .. " already has 3 or more requests in the queue -- ignoring message" )
@@ -90,7 +91,7 @@ end
 --[[
 	@instance
 	@desc Kills the active worker by closing the Discordia client (if one is present)
-		  
+
 		  If 'silent' no warning will be raised when trying to kill a worker that has no attached client
 	@param [boolean - silent]
 ]]
@@ -113,11 +114,11 @@ end
 		  entry for the guild and save the config.
 ]]
 function Worker:handleNewGuild( guild )
-	if not discordia.class.isInstance( guild, "Guild" ) then
+	if not discordia.class.isInstance( guild, discordia.class.classes.Guild ) then
 		return Logger.w( "Invalid guild instance '"..tostring( guild ).."' provided to Worker:handleNewGuild. Ensure the argument is a valid Guild instance" )
 	end
 
-	local guilds = self.guilds
+	local guilds, guildID = self.guilds, guild.id
 	if not guilds[ guildID ] then
 		guilds[ guildID ] = {}
 
@@ -129,7 +130,7 @@ end
 --[[
 	@instance
 	@desc Inserts the command provided into the worker queue.
-		  
+
 		  The entry can either be a 'Message' instance, or a 'Reaction' instance -- depending
 		  on the origin of the event (messageCreate, reactionAdd respectively)
 	@param <Message Instance - originMessage> - If originating from messageCreate event
@@ -149,8 +150,9 @@ function Worker:addToQueue( target, userID )
 		return Logger.w( "Unknown target '"..tostring( target ).."' for worker queue" )
 	end
 
+	coroutine.wrap( self.checkQueue )( self )
 	return true
-end 
+end
 
 --[[
 	@instance
@@ -165,7 +167,14 @@ function Worker:checkQueue()
 	self.working = true
 	while #queue > 0 do
 		local item = queue[ 1 ]
-		--TODO
+		local ok, state = self.commandManager:handleItem( item )
+		if ok then
+			Logger.s( "Executed '"..item.content.."' command for user '"..item.author.fullname.."'" )
+		elseif state == 1 then
+			Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the syntax is invalid" )
+		elseif state == 2 then
+			Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the command doesn't exist" )
+		end
 	end
 
 	self.working = false
@@ -176,7 +185,7 @@ end
 	@desc Saves the Worker 'guilds' table to file for persistent storage
 ]]
 function Worker:saveGuilds()
-	JSONPersist.saveToFile( self.guildPath, self.guilds )	
+	JSONPersist.saveToFile( self.guildPath, self.guilds )
 end
 
 --[[

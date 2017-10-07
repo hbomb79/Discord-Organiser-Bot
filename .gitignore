@@ -2,5 +2,6 @@
 discordia.log
 .banned
 .events
+.guilds.cfg
 *.swp
 gateway.json
