@@ -9,14 +9,27 @@ local function formLog( clock, mode, msg, fg, bg, attr, entire )
 end
 
 --[[
+	@static worker - Worker instance (def. false) - The currently bound worker instance. Tracked by the Logger so it can be gracefully shutdown when an assertion fails.
+	@static showDebugMessages - boolean (def. true) - While true log output at mode DEBUG will be shown. If set to false these log directives will be ignored.
+	@static modes - table (def. { ... }) - A table containing default log modes. See *.
+
 	A basic class that provides static function for outputting at various levels (info, warning, error, fatal) as well
 	as a custom assertion function that automatically closes the active worker when assertion fails.
+
+	*: The modes provided are in format: NAME = { fg, bg, attr, entire }.
+		The 'fg' and 'bg' define the foreground and background colour of the log line (respectively). 'attr'
+		is an optional string value that can be used to further augment the log line (eg: underline, italicize, etc).
+		Lastly, 'entire' an optional boolean argument -- if true the fg, bg and attr will be applied to the entire
+		log line rather than just the 'MODE' information.
+
+	The logger comes with 6 modes: INFO, SUCCESS, DEBUG, WARNING, ERROR and FATAL. They are addressed using the lowercase version
+	of the first character in their mode name (for example, to call 'INFO' you use Logger.i).
 ]]
 
 local Logger = class "Logger" {
 	static = {
 		worker = false;
-		debug = true;
+		showDebugMessages = true;
 
 		modes = {
 			INFO = { 36, 49 },
@@ -34,7 +47,7 @@ local Logger = class "Logger" {
 	@desc WIP
 ]]
 function Logger.static.out( mode, ... )
-	if mode == "DEBUG" and not Logger.debug then return end
+	if mode == "DEBUG" and not Logger.showDebugMessages then return end
 	print( formLog( os.date "%F %T", mode, table.concat( { ... }, " | " ), unpack( Logger.modes[ mode ] ) ) )
 end
 
