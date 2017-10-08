@@ -81,11 +81,7 @@ commands = {
 
     create = {
         action = "createEvent",
-        responses = {
-            "You already own an event in this guild"
-        },
         onFailure = function( eventManager, user, message, status, reason, statusCode )
-            -- Failed to create event
             Reporter.failure( message.channel, "Failed to create event", FAILURE_REASON:format( reason, "create", statusCode ) )
         end
     },
