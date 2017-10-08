@@ -1,4 +1,4 @@
-local Logger, Class, JSONPersist = require "src.util.Logger", require "src.lib.class", require "src.util.JSONPersist"
+local Logger, Class, JSONPersist, Reporter = require "src.util.Logger", require "src.lib.class", require "src.util.JSONPersist", require "src.util.Reporter"
 local discordia = luvitRequire "discordia"
 
 --[[
