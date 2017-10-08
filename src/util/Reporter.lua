@@ -23,6 +23,10 @@ local Reporter = class "Reporter" {
 
 function Reporter.static.send( target, colour, title, description, ... )
     local f = { ... }
+    if Logger.worker and Logger.worker.alive then
+        description = Logger.worker:resolveNames( description )
+    end
+
     coroutine.wrap( function()
         target:send {
             embed = {
