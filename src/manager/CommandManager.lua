@@ -1,4 +1,4 @@
-local Logger, Manager = require "src.util.Logger", require "src.manager.Manager"
+local Logger, Manager, Reporter = require "src.util.Logger", require "src.manager.Manager", require "src.util.Reporter"
 local discordia = luvitRequire "discordia"
 
 --[[
@@ -77,8 +77,8 @@ end
           set, the message will be reacted with a cross.
 
           In all instances, this function will return true if the command
-          was executed -- regardless of it's state. The success state, and
-          status code are returned as arg #2 and #3.
+          was executed -- regardless of it's state. The success state, reason, and
+          status code are returned as arg #2, #3 and #4.
     @param <string - commandName>, <Discordia Message Instance - message>
     @return <true - executed>, <boolean - success>, [number - statusCode]
 ]]
@@ -86,15 +86,15 @@ function CommandManager:executeCommand( commandName, messageContext )
     local com = self.commands[ commandName ]
     local success, statusCode
     if type( com.action ) == "string" then
-        success, statusCode = self.worker.eventManager[ com.action ]( self.worker.eventManager, messageContext.guild.id, messageContext.author.id )
+        success, reason, statusCode = self.worker.eventManager[ com.action ]( self.worker.eventManager, messageContext.guild.id, messageContext.author.id )
     else
-        success, statusCode = com.action( self.worker.eventManager, messageContext.guild.id, messageContext.author.id, messageContext )
+        success, reason, statusCode = com.action( self.worker.eventManager, messageContext.guild.id, messageContext.author.id, messageContext )
     end
 
     if success then
         -- The command executed successfully. Call 'onSuccess' if present, otherwise react to the message with a checkmark.
         if type( com.onSuccess ) == "function" then
-            com.onSuccess( self.worker.eventManager, messageContext.author.id, messageContext, success, statusCode )
+            com.onSuccess( self.worker.eventManager, messageContext.author, messageContext, success, reason, statusCode )
         else
             messageContext:addReaction "✅"
         end
@@ -102,13 +102,13 @@ function CommandManager:executeCommand( commandName, messageContext )
         if com.responses and com.responses[ statusCode ] then
             Reporter.failure( messageContext.channel, "Failed to execute '"..commandName.."'", com.responses[ statusCode ] )
         elseif type( com.onFailure ) == "function" then
-            com.onFailure( self.worker.eventManager, messageContext.author.id, messageContext, success, statusCode )
+            com.onFailure( self.worker.eventManager, messageContext.author, messageContext, success, reason, statusCode )
         else
             messageContext:addReaction "❌"
         end
     end
 
-    return true, success, statusCode
+    return true, success, reason, statusCode
 end
 
 extends "Manager"
