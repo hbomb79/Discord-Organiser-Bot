@@ -1,6 +1,5 @@
 local Logger, Reporter, Worker, CommandHandler = require "src.util.Logger", require "src.util.Reporter", require "src.Worker", require "src.lib.class".getClass "CommandHandler"
 
-local FAILURE_REASON = "%s (error: %s [%s])"
 local perms = luvitRequire "discordia".enums.permission
 
 local function report( code, ... )
@@ -82,13 +81,16 @@ commands = {
     create = {
         action = "createEvent",
         onFailure = function( eventManager, user, message, status, reason, statusCode )
-            Reporter.failure( message.channel, "Failed to create event", FAILURE_REASON:format( reason, "create", statusCode ) )
+            Reporter.failure( message.channel, "Failed to create event", reason )
         end
     },
 
-    cancel = {},
-
-    delete = {},
+    delete = {
+        action = "deleteEvent",
+        onFailure = function( eventManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to delete event", reason )
+        end
+    },
 
     publish = {},
 

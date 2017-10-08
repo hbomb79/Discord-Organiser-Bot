@@ -47,15 +47,14 @@ end
 ]]
 function CommandManager:handleMessage( message )
     local content = message.content
-    if not ( content and content:find "^!%w+" ) then return false, 1 end
 
     local commandName, trailing = content:match "^!(%w+)(.*)"
     local com = self.commands[ commandName ]
 
     if not ( com and com.action ) then
-        return false, 2
+        return false, 1
     elseif com.permissions then
-        if not message.member:getPermissions():has( unpack( com.permissions ) ) then return false, 3 end
+        if not message.member:getPermissions():has( unpack( com.permissions ) ) then return false, 2 end
     end
 
     return self:executeCommand( commandName, message )
