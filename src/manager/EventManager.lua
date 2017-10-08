@@ -64,5 +64,20 @@ function EventManager:createEvent( guildID, userID )
     return Logger.s( SUCCESS:format( "Created and saved event", guildID, userID ) )
 end
 
+--[[
+    @instance
+    @desc
+]]
+function EventManager:deleteEvent( guildID, userID )
+    if not self:getEvent( guildID, userID ) then
+        return report( 1, REFUSE_ERROR:format( "delete event", guildID, userID, "the user doesn't own an event at this guild" ) )
+    end
+
+    self.worker.guilds[ guildID ].events[ userID ] = nil
+    self.worker:saveGuilds()
+
+    return Logger.s( SUCCESS:format( "Deleted event", guildID, userID ) )
+end
+
 extends "Manager"
 return EventManager:compile()

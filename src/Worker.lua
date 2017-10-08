@@ -171,15 +171,14 @@ function Worker:checkQueue()
         if ok then
             Logger.s( "Executed '"..item.content.."' command for user '"..item.author.fullname.."'" )
         elseif state == 1 then
-            Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the syntax is invalid" )
-        elseif state == 2 then
             Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the command doesn't exist" )
-        elseif state == 3 then
+        elseif state == 2 then
             Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the member doesn't have the correct set of permissions" )
         else
             Logger.e( "Unhandled exception caught. Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' for an unknown reason", tostring( state ) )
         end
 
+        self.userCommandRequests[ item.author.id ] = self.userCommandRequests[ item.author.id ] - 1
         table.remove( queue, 1 )
     end
 
