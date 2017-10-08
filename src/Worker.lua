@@ -196,6 +196,26 @@ end
 
 --[[
     @instance
+    @desc This function, when given a string, will return that string
+          modified so that the word 'guild' or 'user', followed by a
+          guild/userID is replaced with the guild/users name.
+
+          Primarialy used for removing unreadable IDs from user
+          reports, while retaining that useful information in
+          log files (names can change, and can exist as duplicates
+          removing any identification purpose).
+    @param <string - textToClean>
+    @return <string - cleanedText>
+]]
+function Worker:resolveNames( textToClean )
+    local guilds = setmetatable( {}, { __index = function( _, k ) local g = self.client.guilds:get( k ); return g and "**" .. g.name .. "**" end } )
+    local users = setmetatable( {}, { __index = function( _, k ) local u = self.client.users:get( k ); return u and "**" .. u.fullname .. "**" end } )
+
+    return textToClean:gsub( "guild (%w+)", guilds ):gsub( "user (%w+)", users )
+end
+
+--[[
+    @instance
     @desc Binds the manager class provided by creating an instance of it
           and setting it's worker to the 'self' object (this worker instance).
 ]]
