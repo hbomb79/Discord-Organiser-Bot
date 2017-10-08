@@ -39,6 +39,34 @@ end
 
 --[[
     @instance
+    @desc Returns the currently published event for the guild provided, or nil
+          if none published.
+
+          If a valid userID is provided then the published event for
+          that user (in the guild) will be returned, or nil if the user has no
+          published event in this guild.
+    @param <string - guildID>, [string - userID]
+    @return <table - event> - If event exists in guild (and is by the user provided)
+    @return nil - No event published (by user, or in general)
+]]
+function EventManager:getPublishedEvent( guildID, userID )
+    local guild = self.worker.guilds[ guildID ]
+    if not ( guild and guild.events ) then return end
+
+    local events = guild.events
+    if userID then
+        if not ( events[ userID ] and events[ userID ].published ) then return end
+
+        return events[ userID ]
+    else
+        for user, event in pairs( events ) do
+            if event.published then return event end
+        end
+    end
+end
+
+--[[
+    @instance
     @desc
 ]]
 function EventManager:createEvent( guildID, userID )

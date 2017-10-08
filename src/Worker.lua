@@ -11,8 +11,8 @@ local discordia = luvitRequire "discordia"
     A core class used as the entry point to the bot.
 
     The Worker class facilitates basic bot functionality, and is extended
-    by other classes such as `GuildManager`, `MessageManager`, `CommandHandler`
-    and other such utility classes.
+    by other classes such as `CommandManager`, `EventManager` and other
+    such utility classes.
 ]]
 
 local Worker = class "Worker" {
