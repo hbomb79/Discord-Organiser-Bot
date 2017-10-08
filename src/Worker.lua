@@ -120,7 +120,7 @@ function Worker:handleNewGuild( guild )
 
 	local guilds, guildID = self.guilds, guild.id
 	if not guilds[ guildID ] then
-		guilds[ guildID ] = {}
+		guilds[ guildID ] = { events = {} }
 
 		Logger.i( "New guild detected (or records of this guild have been lost)", guild.name, "This guild has been registered with the bot" )
 		self:saveGuilds()
@@ -174,7 +174,13 @@ function Worker:checkQueue()
 			Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the syntax is invalid" )
 		elseif state == 2 then
 			Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the command doesn't exist" )
+		elseif state == 3 then
+			Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the member doesn't have the correct set of permissions" )
+		else
+			Logger.e( "Unhandled exception caught. Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' for an unknown reason", tostring( state ) )
 		end
+
+		table.remove( queue, 1 )
 	end
 
 	self.working = false
