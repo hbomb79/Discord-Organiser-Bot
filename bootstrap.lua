@@ -1,11 +1,11 @@
 --[[
-	Bootstrap the Discord bot by loading the OOP class system, Discordia, and
-	creating (and starting) a new instance of Worker.
+    Bootstrap the Discord bot by loading the OOP class system, Discordia, and
+    creating (and starting) a new instance of Worker.
 
-	This program uses a modified version of the Titanium class system (Copyright (c) Harry Felton).
-	See src/lib/class.lua for more information regarding licensing.
+    This program uses a modified version of the Titanium class system (Copyright (c) Harry Felton).
+    See src/lib/class.lua for more information regarding licensing.
 
-	Copyright (c) Harry Felton 2017
+    Copyright (c) Harry Felton 2017
 ]]
 
 print "Starting bootstrap process"
@@ -29,8 +29,8 @@ local Logger = require "src.util.Logger"
 -- Instantiate a Worker
 local ok, err = pcall( require "src.Worker" )
 if not ok then
-	Logger.f( "Worker instance failed", tostring( err ) )
-	return false
+    Logger.f( "Worker instance failed", tostring( err ) )
+    return false
 end
 
 Logger.s "Finished bootstrap -- Control given to worker"
