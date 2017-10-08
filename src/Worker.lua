@@ -43,8 +43,8 @@ function Worker:__init__( ... )
 	self:resolve( ... )
 
 	Logger.bindActiveWorker( self )
-	--TODO: self.messageManager = self:bindManager( require "src.manager.MessageManager" )
-	--TODO: self.userManager = self:bindManager( require "src.manager.UserManager" )
+	self.commandManager = self:bindManager( require "src.manager.CommandManager" )
+	self.eventManager = self:bindManager( require "src.manager.EventManager" )
 
 	self.client = Logger.assert( discordia.Client( self.clientOptions ), "Failed to instantiate Discordia client", "Discordia client opening" )
 	self.guilds = Logger.assert( JSONPersist.loadFromFile( self.guildPath ), "Failed to load guild information", "Guilds loaded" )
