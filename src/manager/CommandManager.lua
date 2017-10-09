@@ -41,6 +41,25 @@ end
 
 --[[
     @instance
+    @desc Splits the string given up based on the guilds prefix
+          and the content. Returns the commandName and the
+          argument following IF the string matches command syntax.
+
+          If not, nil is returned.
+    @param <string - guildID>, <string - commandString>
+    @return <string - commandName>, <string - commandArg> - If valid syntax
+]]
+function CommandManager:splitCommand( guildID, commandString )
+    local guildPrefix = self.worker.guilds[ guildID ].prefix or "!"
+    local commandName, trailing = commandString:match( "^" .. guildPrefix .. "(%w+)(.*)" )
+
+    if not commandName then return end
+
+    return commandName, trailing
+end
+
+--[[
+    @instance
     @desc Continues item handling by checking that the command received is valid
           and that the user is within their rights to execute it.
     @param <Discordia Message Instance - message>
@@ -48,7 +67,7 @@ end
 function CommandManager:handleMessage( message )
     local content = message.content
 
-    local commandName, trailing = content:match "^!(%w+)(.*)"
+    local commandName, trailing = self:splitCommand( message.guild.id, content )
     local com = self.commands[ commandName ]
 
     if not ( com and com.action ) then
