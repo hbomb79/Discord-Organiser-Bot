@@ -146,5 +146,56 @@ function EventManager:deleteEvent( guildID, userID )
     return Logger.s( SUCCESS:format( "Deleted event", guildID, userID ) )
 end
 
+--[[
+    @instance
+    @desc Publishes the event owned by the user at the guild provided.
+
+          * Will fail for the following reasons -- use 'errorCode' to determine reason:
+            1: user doesn't own an event at this guild
+            2: user's event is already published
+    @param <string - guildID>, <string - userID>
+    @return <boolean - success>, <string - output>, [number - errorCode]
+]]
+function EventManager:publishEvent( guildID, userID )
+    local event = self:getEvent( guildID, userID )
+    if not event then
+        return report( 1, REFUSE_ERROR:format( "publish event", guildID, userID, "the user doesn't own an event at this guild" ) )
+    elseif event.published then
+        return report( 2, REFUSE_ERROR:format( "publish event", guildID, userID, "the user's event is already published" ) )
+    end
+
+    event.published = true
+    self:repairUserEvent( guildID, userID )
+    self:saveEvents()
+
+    return Logger.s( SUCCESS:format( "Published event", guildID, userID ) )
+end
+
+--[[
+    @instance
+    @desc Unpublishes the event owned by the user at the guild provided.
+
+          * Will fail for the following reasons -- use 'errorCode' to determine reason:
+            1: user doesn't own an event at this guild
+            2: user's event is not published
+    @param <string - guildID>, <string - userID>
+    @return <boolean - success>, <string - output>, [number - errorCode]
+]]
+function EventManager:unpublishEvent( guildID, userID )
+    local event = self:getEvent( guildID, userID )
+    if not event then
+        return report( 1, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user doesn't own an event at this guild" ) )
+    elseif not event.published then
+        return report( 2, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user's event is not published" ) )
+    end
+
+    self:revokeFromRemote( event )
+    event.published = nil
+
+    self:saveEvents()
+
+    return Logger.s( SUCCESS:format( "Unpublished event", guildID, userID ) )
+end
+
 extends "Manager" mixin "RemoteHandler"
 return EventManager:compile()
