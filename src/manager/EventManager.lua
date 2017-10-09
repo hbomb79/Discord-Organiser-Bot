@@ -1,4 +1,4 @@
-local Reporter, Logger, Manager = require "src.util.Reporter", require "src.util.Logger", require "src.manager.Manager"
+local Reporter, Logger, Manager, RemoteHandler = require "src.util.Reporter", require "src.util.Logger", require "src.manager.Manager", require "src.util.RemoteHandler"
 
 local REFUSE_ERROR, SUCCESS = "Refusing to %s at guild %s for user %s because %s", "%s at guild %s for user %s"
 local function report( code, ... )
@@ -107,5 +107,5 @@ function EventManager:deleteEvent( guildID, userID )
     return Logger.s( SUCCESS:format( "Deleted event", guildID, userID ) )
 end
 
-extends "Manager"
+extends "Manager" mixin "RemoteHandler"
 return EventManager:compile()
