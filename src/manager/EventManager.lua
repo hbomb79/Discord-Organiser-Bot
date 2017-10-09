@@ -84,7 +84,12 @@ end
 
 --[[
     @instance
-    @desc
+    @desc Creates an event for the user at the guild provided.
+
+          * Will fail for the following reasons -- use 'errorCode' to determine reason:
+            1: user already has an event at this guild
+    @param <string - guildID>, <string - userID>
+    @return <boolean - success>, <string - output>, [number - errorCode]
 ]]
 function EventManager:createEvent( guildID, userID )
     if self:getEvent( guildID, userID ) then
