@@ -98,9 +98,19 @@ commands = {
         end
     },
 
-    publish = {},
+    publish = {
+        action = "publishEvent",
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to publish event", reason )
+        end
+    },
 
-    unpublish = {},
+    unpublish = {
+        action = "unpublishEvent",
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to unpublish event", reason )
+        end
+    },
 
     createPoll = {},
 
