@@ -74,7 +74,7 @@ end
 function Worker:start()
     -- self.client:on( "reactionAdd", function( reaction, userID ) self.messageManager:handleInboundReaction( reaction, userID ) end )
     self.client:on( "messageCreate", function( message )
-        if message.author.bot or not ( message.guild and self.guilds[ message.guild.id ] ) or not ( message.content and message.content:find "^!%w+" ) then return end
+        if message.author.bot or not ( message.guild and self.guilds[ message.guild.id ] ) or not ( message.content and message.content:find( "^".. ( self.guilds[ message.guild.id ].prefix or "!" ) .."%w+" ) ) then return end
 
         local reqs = self.userCommandRequests[ message.author.id ] or 0
         if reqs >= 3 then
