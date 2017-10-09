@@ -25,8 +25,9 @@ local commands
 commands = {
     help = {
         help = "Display this help menu.\n\nRun **!help commands [command1, command2, ...]** to see help on the given commands (eg: **!help commands create cancel** gives help for the *create* and *cancel* command).",
-        action = function( evManager, user, message, arg )
-            local args = splitArguments( arg )
+        action = function( evManager, guildID, userID, message )
+            local user = evManager.worker.client:getUser( userID )
+            local args = splitArguments( message.content:match "^%!%w+%s*(.*)$" )
             if args[ 1 ] == "commands" then
                 if args[ 2 ] then
                     Logger.i "Serving help information for requested commands"
@@ -36,7 +37,10 @@ commands = {
                         if commands[ com ] then
                             local h = commands[ com ].help
                             Logger.d( "Serving help for cmd " .. com )
-                            fields[ #fields + 1 ] = { name = "__!".. com .. "__", value = ( com.admin and "*This command can only be executed by BGnS administrators*\n\n" or "" ) .. ( #h == 0 and "**HELP UNAVAILABLE**" or h ) }
+
+                            if h and #h > 0 then
+                                fields[ #fields + 1 ] = { name = "__!".. com .. "__", value = h }
+                            end
                         else
                             Logger.w( "Help information not available for "..com )
                             invalidFields[ #invalidFields + 1 ] = com
@@ -59,7 +63,9 @@ commands = {
                 else
                     local fields = {}
                     for name, config in pairs( commands ) do
-                        fields[ #fields + 1 ] = { name = "__!" .. name .. "__", value = ( config.admin and "*This command can only be executed by BGnS administrators*\n\n" or "" ) .. ( #config.help == 0 and "**HELP UAVAILABLE**" or config.help ) }
+                        if config.help and #config.help > 0 then
+                            fields[ #fields + 1 ] = { name = "__!" .. name .. "__", value = config.help }
+                        end
                     end
 
                     Reporter.info( user, "Command Help", "Below is a list of help information for each of the commands you can use. " .. tostring( #fields ), unpack( fields ) )
