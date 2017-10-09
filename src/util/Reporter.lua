@@ -24,7 +24,12 @@ local Reporter = class "Reporter" {
 function Reporter.static.send( target, colour, title, description, ... )
     local f = { ... }
     if Logger.worker and Logger.worker.alive then
-        description = Logger.worker:resolveNames( description )
+        local prefix = target.guild and Logger.worker.guilds[ target.guild.id ].prefix
+        description = Logger.worker:resolveNames( description, prefix )
+
+        for i = 1, #f do
+            f[ i ].value = Logger.worker:resolveNames( f[ i ].value, prefix )
+        end
     end
 
     coroutine.wrap( function()

@@ -211,11 +211,11 @@ end
     @param <string - textToClean>
     @return <string - cleanedText>
 ]]
-function Worker:resolveNames( textToClean )
+function Worker:resolveNames( textToClean, prefix )
     local guilds = setmetatable( {}, { __index = function( _, k ) local g = self.client.guilds:get( k ); return g and "**" .. g.name .. "**" end } )
     local users = setmetatable( {}, { __index = function( _, k ) local u = self.client.users:get( k ); return u and "**" .. u.fullname .. "**" end } )
 
-    return textToClean:gsub( "guild (%w+)", guilds ):gsub( "user (%w+)", users )
+    return textToClean:gsub( "guild (%w+)", guilds ):gsub( "user (%w+)", users ):gsub( "%'cmd%s+(.-)%'", function( v ) return v and ( "**%s%s**" ):format( prefix or "!", v ) end )
 end
 
 --[[
