@@ -110,7 +110,7 @@ function EventManager:createEvent( guildID, userID )
         published = false;
     }
 
-    self.worker:saveGuilds()
+    self:saveEvents( self.worker.guilds[ guildID ].events[ userID ] )
     return Logger.s( SUCCESS:format( "Created and saved event", guildID, userID ) )
 end
 
