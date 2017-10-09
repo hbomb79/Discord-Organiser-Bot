@@ -26,6 +26,19 @@ local EventManager = class "EventManager" {}
 
 --[[
     @instance
+    @desc Flags the event provided as being updated (if an
+          event is provided).
+
+          Then saves all event details via worker:saveGuilds
+    @param [table - event]
+]]
+function EventManager:saveEvents( event )
+    if event then event.updated = true end
+    self.worker:saveGuilds()
+end
+
+--[[
+    @instance
     @desc Returns the event for user 'userID' at guild 'guildID' if
           present
     @param <string - guildID>, <string - userID>
