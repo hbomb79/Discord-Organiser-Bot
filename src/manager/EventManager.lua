@@ -59,10 +59,11 @@ end
           that user (in the guild) will be returned, or nil if the user has no
           published event in this guild.
     @param <string - guildID>, [string - userID]
-    @return <table - event> - If event exists in guild (and is by the user provided)
+    @return <table - event> - If a userID was provided and the user owns an event at the guild, the event will be returned
+    @return <table - events> - If no userID was provided a table of all the published events will be returned
     @return nil - No event published (by user, or in general)
 ]]
-function EventManager:getPublishedEvent( guildID, userID )
+function EventManager:getPublishedEvents( guildID, userID )
     local guild = self.worker.guilds[ guildID ]
     if not ( guild and guild.events ) then return end
 
@@ -72,9 +73,12 @@ function EventManager:getPublishedEvent( guildID, userID )
 
         return events[ userID ]
     else
+        local evs = {}
         for user, event in pairs( events ) do
-            if event.published then return event end
+            if event.published then table.insert( evs, event ) end
         end
+
+        return evs
     end
 end
 
