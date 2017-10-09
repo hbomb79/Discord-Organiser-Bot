@@ -116,15 +116,32 @@ end
 
 --[[
     @instance
-    @desc
+    @desc Deletes the event owned by the user at the guild provided. If the event is published
+          it will be unpublished automatically before deletion.
+
+          All RSVPs, poll votes and event details will be lost when the event is deleted. These could
+          potentially be reconstructed from log details, however it is unlikely.
+
+          Take care when deleting events.
+
+          * Will fail for the following reasons -- use 'errorCode' to determine reason:
+            1: user doesn't own an event at this guild
+    @param <string - guildID>, <string - userID>
+    @return <boolean - success>, <string - output>, [number - errorCode]
 ]]
 function EventManager:deleteEvent( guildID, userID )
-    if not self:getEvent( guildID, userID ) then
+    local event = self:getEvent( guildID, userID )
+    if not event then
         return report( 1, REFUSE_ERROR:format( "delete event", guildID, userID, "the user doesn't own an event at this guild" ) )
     end
 
+    if event.published then
+        Logger.i( "Attempting to delete published event -- unpublishing event first" )
+        self:unpublishEvent( guildID, userID )
+    end
+
     self.worker.guilds[ guildID ].events[ userID ] = nil
-    self.worker:saveGuilds()
+    self:saveEvents()
 
     return Logger.s( SUCCESS:format( "Deleted event", guildID, userID ) )
 end
