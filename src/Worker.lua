@@ -88,6 +88,7 @@ function Worker:start()
     end )
     self.client:on( "guildCreate", function( guild ) self:handleNewGuild( guild ) end )
 
+    self.eventManager:repairAllGuilds()
     self.alive = true
     Logger.s "Started worker"
 end

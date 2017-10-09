@@ -1,5 +1,5 @@
 local discordia = luvitRequire "discordia"
-local Worker = require "src.lib.class".getClass "Worker"
+local Logger, Worker = require "src.util.Logger", require "src.lib.class".getClass "Worker"
 
 local function formResponses( client, responses )
 	local str, states = "", { {}, {}, {} }
@@ -134,6 +134,7 @@ end
     @param <string - guildID>, <string - userID>, [boolean - force]
 ]]
 function RemoteHandler:repairUserEvent( guildID, userID, force )
+    Logger.i( "Attempting to repair user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
     local event = self:getEvent( guildID, userID )
     if not ( event and event.published ) then return end
 
@@ -144,14 +145,18 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     if not channel then return end
 
     if not ( event.snowflake and channel:getMessage( event.snowflake ) ) then
+        Logger.w( "Event snowflake missing (or message missing from remote), pushing event message to remote" )
         self:pushEventToRemote( guildID, userID, true )
     elseif event.updated then
+        Logger.i( "Event snowflake valid, but event has changed — editing message" )
         -- Edit the message
     end
 
     if event.poll and not ( event.poll.snowflake and channel:getMessage( event.poll.snowflake ) ) then
+        Logger.w( "Poll snowflake missing (or message missing from remote), pushing event message to remote" )
         self:pushPollToRemote( guildID, userID, true )
     elseif event.poll.updated then
+        Logger.i( "Poll snowflake valid, but event has changed — editing message" )
         -- Edit the message
     end
 
@@ -164,10 +169,21 @@ end
     @desc Fixes all events published to the guild
     @param <string - guildID>, [boolean - force]
 ]]
-function RemoteHandler:repairGuildEvents( guildID, force )
+function RemoteHandler:repairGuild( guildID, force )
     local events = self:getPublishedEvents( guildID )
     for e = 1, #events do
         self:repairUserEvent( guildID, events[ e ].author, force )
+    end
+end
+
+--[[
+    @instance
+    @desc Repairs all events published to all registered guilds
+    @param [boolean - force]
+]]
+function RemoteHandler:repairAllGuilds( force )
+    for guildID in pairs( self.worker.guilds ) do
+        self:repairGuild( guildID, force )
     end
 end
 
