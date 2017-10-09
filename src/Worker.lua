@@ -16,6 +16,10 @@ local discordia = luvitRequire "discordia"
 ]]
 
 local Worker = class "Worker" {
+    static = {
+        ATTEND_ENUM = { "not going", "might be going", "going" };
+    };
+
     client = false;
     tokenPath = ".token";
     guildPath = ".guilds.cfg";
