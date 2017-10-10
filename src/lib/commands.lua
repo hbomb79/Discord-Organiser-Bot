@@ -94,9 +94,9 @@ commands = {
             if not settingArg then
                 local fields = {}
                 for name, config in pairs( SettingsHandler.SETTINGS ) do
-                    local currentOverride = eventManager.worker:getOverride( guildID, name )
+                    local currentOverride = eventManager.worker:getOverrideForDisplay( guildID, name )
                     local isOverrideDefault = eventManager.worker:isOverrideDefault( guildID, name )
-                    fields[ #fields + 1 ] = { name = ("__%s__"):format( name ), value = config.help .. "\n*Currently: " .. tostring( currentOverride ) .. ( isOverrideDefault and " - default value" or "" ) .. "*" }
+                    fields[ #fields + 1 ] = { name = ("__%s__"):format( name ), value = config.help .. "\n*Currently " .. tostring( currentOverride ) .. ( isOverrideDefault and " - default value" or "" ) .. "*" }
                 end
 
                 Reporter.info( message.channel, "Guild Settings", "This command can be used to configure the bot specifically for your guild. Use 'cmd setting command [value]', where `command` is one of below. If 'value' is given, the setting will be set to that value (unless value is 'none', in which case the setting will be reset) -- otherwise the current value will be shown.", unpack( fields ) )
@@ -105,10 +105,10 @@ commands = {
 
             local isGetting = not ( args[ 2 ] and #args[ 2 ] > 0 )
             local function reportVal( updated )
-                local currentOverride = eventManager.worker:getOverride( guildID, settingArg )
+                local currentOverride = eventManager.worker:getOverrideForDisplay( guildID, settingArg )
                 local isOverrideDefault = eventManager.worker:isOverrideDefault( guildID, settingArg )
 
-                Reporter[ updated and "success" or "info" ]( message.channel, "Guild setting '"..settingArg.."'", "The value for this guild setting is " .. ( updated and "now" or "" ) .. " '"..tostring( currentOverride ).."'" .. ( isOverrideDefault and "\n\n*This is the default value*" or "" ) )
+                Reporter[ updated and "success" or "info" ]( message.channel, "Guild setting '"..settingArg.."'", "The value for this guild setting is " .. ( updated and "now " or "" ) .. tostring( currentOverride ) .. ( isOverrideDefault and "\n\n*This is the default value*" or "" ) )
             end
 
             if SettingsHandler.SETTINGS[ settingArg ] then
@@ -116,9 +116,7 @@ commands = {
                     reportVal()
                     return Logger.s( "Served guild setting '"..settingArg.."' for guild '"..guildID.."'" )
                 else
-                    local targetVal = args[ 2 ] ~= "none" and args[ 2 ] or nil
-                    guildConfig[ settingArg ] = targetVal
-                    local ok, err = eventManager.worker:setOverride( guildID, settingArg, targetVal )
+                    local ok, err = eventManager.worker:setOverride( guildID, settingArg, args[ 2 ] ~= "none" and args[ 2 ] or nil )
                     if ok then
                         reportVal( true )
                         return Logger.s( "Updated guild setting '"..settingArg.."' to '"..args[ 2 ].."' under instruction from user '"..userID.."' at guild '"..guildID.."'" )

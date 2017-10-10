@@ -5,6 +5,21 @@ local function checkPrefix( worker, guildID, value )
     return false, "Prefix is invalid. Must be between 1-10 character long and contain no spaces"
 end
 
+local function checkChannel( worker, guildID, value )
+    if value == nil then return true end
+
+    print( tostring( value ) )
+    value = value:match "%<#(%w+)%>" or value
+    print( tostring( value ) )
+
+    local guild = worker.client:getGuild( guildID )
+    if not guild:getChannel( value ) then
+        return false, "Channel provided doesn't exist (either provide the channel ID, or mention the channel using `#channel-name-here`)"
+    end
+
+    return value
+end
+
 local function checkGuildAndProperty( worker, guildID, property )
     local guildConfig, config = worker.guilds[ guildID ], SettingsHandler.SETTINGS[ property ]
     if not config then
@@ -22,6 +37,16 @@ end
 
     Handles assigning setting values, defaults and getting/saving
     settings to file.
+
+    Each setting can have the following configurations:
+        help: A string displayed when the user requests help for the setting (via 'cmd settings')
+        default: The value returned when no other value can be found
+        predicate: A function that is called before the value is set. If the function returns false, the value won't be updated.
+                   If the function returns true, the value will be set. If the function returns another value, the returned
+                   value will be used to set the property
+        show: A function called when the property is requested for display purposes (via self:getOverrideForDisplay). Allows
+              markdown/Discord formatting (such as for channel names, etc).
+        useFallback: If true, the value of the property with an underscore prefixed (eg: prefix -> _prefix) will be used if a normal value cannot be found
 ]]
 
 SettingsHandler = class "SettingsHandler" {
@@ -29,13 +54,14 @@ SettingsHandler = class "SettingsHandler" {
         SETTINGS = {
             prefix = {
                 help = "",
-                default = "!", -- This value will be returned when getting the property if was isn't set for the guild
-                predicate = checkPrefix, -- This function will be called (if set) when the setting is changed. If this function returns false, the property will NOT be set and the 2nd return from this function will be used as the reason (string).
+                default = "!",
+                predicate = checkPrefix,
             },
-            channelID = {
+            channel = {
                 help = "",
-                useFallback = true, -- If the property isn't set, the fallback value (in this case, _channelID) will be used on the guild properties
-                default = false -- If the fallback isn't available, false will be used. This will stop the bot from attempting to push events for this guild (no channel)
+                useFallback = true, --TODO: Track default channel in guild
+                predicate = checkChannel,
+                show = function( _, __, val ) return "<#" .. val .. ">" end
             }
         };
     }
@@ -53,12 +79,16 @@ function SettingsHandler:setOverride( guildID, property, value )
     local guildConfig, config = checkGuildAndProperty( self, guildID, property )
     if not guildConfig then return false, config end
 
-    local ok, err = type( config.predicate ) ~= "function" and true or config.predicate( self, guildID, value )
-    if not ok then return false, err end
+    if type( config.predicate ) == "function" then
+        local ok, err = config.predicate( self, guildID, value )
+        if not ok then return false, err end
 
-    guildConfig[ property ] = value
+        guildConfig[ property ] = ok ~= true and ok or value
+    else
+        guildConfig[ property ] = value
+    end
+
     self:saveGuilds()
-
     return true
 end
 
@@ -78,6 +108,21 @@ function SettingsHandler:getOverride( guildID, property )
 
     local fallbackProperty = type( config.useFallback ) == "string" and config.useFallback or "_" .. property
     return guildConfig[ property ] or ( config.useFallback and guildConfig[ fallbackProperty ] ) or config.default
+end
+
+--[[
+    @instance
+    @desc Returns the value for the guild override in a user
+          readable way by using the 'show' method attached
+          to the setting type
+    @param <string - guildID>, <string - property>
+]]
+function SettingsHandler:getOverrideForDisplay( guildID, property )
+    local val, reason = self:getOverride( guildID, property )
+    if not val then return false, reason end
+
+    local config = SettingsHandler.SETTINGS[ property ]
+    return type( config.show ) == "function" and config.show( self, guildID, val ) or ("'%s'"):format( val )
 end
 
 --[[
