@@ -99,7 +99,7 @@ commands = {
                     fields[ #fields + 1 ] = { name = ("__%s__"):format( name ), value = config.help .. "\n*Currently " .. tostring( currentOverride ) .. ( isOverrideDefault and " - default value" or "" ) .. "*" }
                 end
 
-                Reporter.info( message.channel, "Guild Settings", "This command can be used to configure the bot specifically for your guild. Use 'cmd setting command [value]', where `command` is one of below. If 'value' is given, the setting will be set to that value (unless value is 'none', in which case the setting will be reset) -- otherwise the current value will be shown.", unpack( fields ) )
+                Reporter.info( message.channel, "Guild Settings", "This command can be used to configure the bot specifically for your guild. Use 'cmd settings command [value]', where `command` is one of below. If 'value' is given, the setting will be set to that value (unless value is 'none', in which case the setting will be reset) -- otherwise the current value will be shown.", unpack( fields ) )
                 return Logger.s( "Served general settings information to user " .. userID .." via guild " .. guildID .. " channel " .. message.channel.id .. " ("..message.channel.name..")" )
             end
 
