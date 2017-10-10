@@ -1,4 +1,4 @@
-local Logger, Class, JSONPersist, Reporter = require "src.util.Logger", require "src.lib.class", require "src.util.JSONPersist", require "src.util.Reporter"
+local Logger, Class, JSONPersist, Reporter, SettingsHandler = require "src.util.Logger", require "src.lib.class", require "src.util.JSONPersist", require "src.util.Reporter", require "src.util.SettingsHandler"
 local discordia = luvitRequire "discordia"
 
 --[[
@@ -74,7 +74,8 @@ end
 function Worker:start()
     -- self.client:on( "reactionAdd", function( reaction, userID ) self.messageManager:handleInboundReaction( reaction, userID ) end )
     self.client:on( "messageCreate", function( message )
-        if message.author.bot or not ( message.guild and self.guilds[ message.guild.id ] ) or not ( message.content and message.content:find( "^".. ( self.guilds[ message.guild.id ].prefix or "!" ) .."%w+" ) ) then return end
+        local guildID = message.guild and message.guild.id
+        if message.author.bot or not ( guildID and self.guilds[ guildID ] ) or not ( message.content and message.content:find( "^".. self:getOverride( guildID, "prefix" ) .."%w+" ) ) then return end
 
         local reqs = self.userCommandRequests[ message.author.id ] or 0
         if reqs >= 3 then
@@ -237,4 +238,5 @@ configureConstructor {
     }
 }
 
+mixin "SettingsHandler"
 return Worker:compile()
