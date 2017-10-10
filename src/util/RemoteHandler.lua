@@ -35,7 +35,10 @@ end
 ]]
 
 local RemoteHandler = class "RemoteHandler" {
-    pushing = {};
+    static = {
+        ATTEND_REACTIONS = { "✅", "❔", "🚫" };
+    };
+    -- XXX: pushing = {};
 }
 
 --[[
@@ -44,41 +47,46 @@ local RemoteHandler = class "RemoteHandler" {
     @param <string - guildID>, <string - userID>
 ]]
 function RemoteHandler:revokeFromRemote( guildID, userID )
-    --TODO local guild, user = self.worker.client:getGuild( guildID ), self.worker.client:getUser( userID )
-end
+    local event = self:getEvent( guildID, userID )
+    if not ( event and event.published ) then return end
 
---[[
-    @instance
-    @desc Pushes the event message (not the poll) for user at
-          guild to the remote. If not 'noReact' then the valid
-          reactions (for RSVPs) will be added to the message
-          asynchronously
-    @param <string - guildID>, <string - userID>
-]]
-function RemoteHandler:pushEventToRemote( guildID, userID )
+    local channelID = self.worker:getOverride( guildID, "channel" )
+    if not channelID then return end
 
-end
+    local channel = self.worker.client:getGuild( guildID ):getChannel( channelID )
+    if not channel then return end
 
---[[
-    @instance
-    @desc Pushes the poll message (not the event) for user at
-          the guild to the remote. If not 'noReact' then the
-          value reactions (for voting) will be added to the
-          message asynchronously
-    @param <string - guildID>, <string - userID>
-]]
-function RemoteHandler:pushPollToRemote( guildID, userID )
+    if event.snowflake then
+        local eventMessage = channel:getMessage( event.snowflake )
+        if eventMessage then eventMessage:delete() end
+    end
 
+    if event.poll and event.poll.snowflake then
+        local pollMessage = channel:getMessage( event.poll.snowflake )
+        if pollMessage then pollMessage:delete() end
+    end
 end
 
 --[[
     @instance
     @desc Repairs the reactions for the event provided (both
           poll and event message(s)).
-    @param <string - guildID>, <string - userID>
+    @param <string - guildID>, <string - userID>, <table - event>, <Discordia Channel Instance - channel>
 ]]
-function RemoteHandler:repairReactions( guildID, userID )
+function RemoteHandler:repairReactions( guildID, userID, event, channel )
+    local eventMessage = channel:getMessage( event.snowflake )
+    if not eventMessage then return Logger.e( "Cannot repair reactions on event message because the message doesn't exist at the snowflake on record" ) end
 
+    for i = 1, #RemoteHandler.ATTEND_REACTIONS do
+        local reaction = eventMessage.reactions:get( RemoteHandler.ATTEND_REACTIONS[ i ] )
+        if not reaction then
+            eventMessage:addReaction( RemoteHandler.ATTEND_REACTIONS[ i ] )
+        elseif reaction.count > 1 then
+            for user in reaction:getUsers():iter() do
+                if user.id ~= self.worker.client.user.id then reaction:delete( user.id ) end
+            end
+        end
+    end
 end
 
 --[[
@@ -95,13 +103,12 @@ end
           provided and the guild)
     @param <table - event>, [boolean - forPoll]
 ]]
-function RemoteHandler:generateEmbed( event, forPoll )
-    local client = self.worker.client
+function RemoteHandler:generateEmbed( guildID, userID, forPoll )
+    local client, event = self.worker.client, self.worker.guilds[ guildID ].events[ userID ]
 	if forPoll then
         print "Generating embeds for poll information is NYI"
 	else
-		local userID = event.author
-		local nickname = worker.cachedGuild:getMember( userID ).nickname
+		local nickname = self.worker.client:getGuild( guildID ):getMember( userID ).nickname
 		return {
 			title = event.title,
 			description = event.desc,
@@ -134,34 +141,44 @@ end
     @param <string - guildID>, <string - userID>, [boolean - force]
 ]]
 function RemoteHandler:repairUserEvent( guildID, userID, force )
-    Logger.i( "Attempting to repair user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
     local event = self:getEvent( guildID, userID )
     if not ( event and event.published ) then return end
 
-    local channelID = self.worker.guilds[ guildID ].channelID
+    local channelID = self.worker:getOverride( guildID, "channel" )
     if not channelID then return end
 
-    local channel = self.worker:getGuild( guildID ):getChannel( channelID )
+    local channel = self.worker.client:getGuild( guildID ):getChannel( channelID )
     if not channel then return end
 
     if not ( event.snowflake and channel:getMessage( event.snowflake ) ) then
+        local eventMessage = channel:send { embed = self:generateEmbed( guildID, userID ) }
+        if not eventMessage then
+            return Logger.e( "Failed to push event message for user "..userID.." event to guild " .. guildID )
+        end
+
+        event.snowflake, event.updated = eventMessage.id, false
         Logger.w( "Event snowflake missing (or message missing from remote), pushing event message to remote" )
-        self:pushEventToRemote( guildID, userID, true )
     elseif event.updated then
+        channel:getMessage( event.snowflake ):setEmbed( self:generateEmbed( guildID, userID ) )
+        event.updated = false
+
         Logger.i( "Event snowflake valid, but event has changed — editing message" )
-        -- Edit the message
     end
 
-    if event.poll and not ( event.poll.snowflake and channel:getMessage( event.poll.snowflake ) ) then
-        Logger.w( "Poll snowflake missing (or message missing from remote), pushing event message to remote" )
-        self:pushPollToRemote( guildID, userID, true )
-    elseif event.poll.updated then
-        Logger.i( "Poll snowflake valid, but event has changed — editing message" )
-        -- Edit the message
+    if event.poll then
+        if not ( event.poll.snowflake and channel:getMessage( event.poll.snowflake ) ) then
+            Logger.w( "Poll snowflake missing (or message missing from remote), pushing event message to remote" )
+            self:pushPollToRemote( guildID, userID, true )
+        elseif event.poll.updated then
+            Logger.i( "Poll snowflake valid, but event has changed — editing message" )
+            channel:getMessage( event.poll.snowflake ):setEmbed( self:generateEmbed( guildID, userID, true ) )
+        end
     end
 
     -- Repair the reactions attached to both event and poll messages (if present).
-    self:repairReactions( guildID, userID )
+    self:repairReactions( guildID, userID, event, channel )
+    self.worker:saveGuilds()
+    Logger.s( "Repaired user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
 end
 
 --[[
@@ -183,7 +200,7 @@ end
 ]]
 function RemoteHandler:repairAllGuilds( force )
     for guildID in pairs( self.worker.guilds ) do
-        self:repairGuild( guildID, force )
+        coroutine.wrap( self.repairGuild )( self, guildID, force ) -- Each guild has it's own coroutine to repair itself in. Event's inside the same guild will run synchronously
     end
 end
 
