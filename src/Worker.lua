@@ -88,6 +88,33 @@ function Worker:start()
         self:addToQueue( message )
     end )
     self.client:on( "guildCreate", function( guild ) self:handleNewGuild( guild ) end )
+    self.client:on( "guildDelete", function( guild ) if self.guilds[ guild.id ] then self.guilds[ guild.id ] = nil; self:saveGuilds() end end )
+    self.client:on( "channelDelete", function( channel )
+        local guildConfig = self.guilds[ channel.guild.id ]
+        if guildConfig._channel == channel.id then
+            local channels = channel.guild.textChannels:toArray()
+            guildConfig._channel = channels[ 1 ] and channels[ 1 ].id or nil
+
+            if not channels[ 1 ] then return end
+            Reporter.warning( channels[ 1 ], "Event Organiser Channel Selection", "This channel has been automatically selected as a fallback channel for the event organiser.\n\nIf you don't want this channel being used by the bot, use 'cmd settings channel #mention-chanel' to specify which channel the bot should use to announce events" )
+        end
+
+        if guildConfig.channel == channel.id then guildConfig.channel = nil end
+
+        self:saveGuilds()
+    end )
+    self.client:on( "channelCreate", function( channel )
+        local guildConfig = self.guilds[ channel.guild.id ]
+        if not guildConfig._channel then
+            local channels = channel.guild.textChannels:toArray()
+            guildConfig._channel = channels[ 1 ] and channels[ 1 ].id or nil
+
+            if not channels[ 1 ] then return end
+            Reporter.warning( channels[ 1 ], "Event Organiser Channel Selection", "This channel has been automatically selected as a fallback channel for the event organiser.\n\nIf you don't want this channel being used by the bot, use 'cmd settings channel #mention-chanel' to specify which channel the bot should use to announce events" )
+        end
+
+        self:saveGuilds()
+    end )
 
     self.eventManager:repairAllGuilds()
     self.alive = true
@@ -126,7 +153,8 @@ function Worker:handleNewGuild( guild )
 
     local guilds, guildID = self.guilds, guild.id
     if not guilds[ guildID ] then
-        guilds[ guildID ] = { events = {} }
+        local channels = guild.textChannels:toArray()
+        guilds[ guildID ] = { events = {}, _channel = channels[ 1 ] and channels[ 1 ].id or nil }
 
         Logger.i( "New guild detected (or records of this guild have been lost)", guild.name, "This guild has been registered with the bot" )
         self:saveGuilds()
