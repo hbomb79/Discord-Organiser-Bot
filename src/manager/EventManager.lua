@@ -189,7 +189,7 @@ function EventManager:unpublishEvent( guildID, userID )
         return report( 2, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user's event is not published" ) )
     end
 
-    self:revokeFromRemote( event )
+    self:revokeFromRemote( guildID, userID )
     event.published = nil
 
     self:saveEvents()
