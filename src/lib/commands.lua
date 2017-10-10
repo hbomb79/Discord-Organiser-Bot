@@ -108,7 +108,7 @@ commands = {
                 local currentOverride = eventManager.worker:getOverride( guildID, settingArg )
                 local isOverrideDefault = eventManager.worker:isOverrideDefault( guildID, settingArg )
 
-                Reporter.info( message.channel, "Guild setting '"..settingArg.."'", "The value for this guild setting is " .. ( updated and "now" or "" ) .. " '"..tostring( currentOverride ).."'" .. ( isOverrideDefault and "\n\n*This is the default value*" or "" ) )
+                Reporter[ updated and "success" or "info" ]( message.channel, "Guild setting '"..settingArg.."'", "The value for this guild setting is " .. ( updated and "now" or "" ) .. " '"..tostring( currentOverride ).."'" .. ( isOverrideDefault and "\n\n*This is the default value*" or "" ) )
             end
 
             if SettingsHandler.SETTINGS[ settingArg ] then
@@ -120,7 +120,7 @@ commands = {
                     guildConfig[ settingArg ] = targetVal
                     local ok, err = eventManager.worker:setOverride( guildID, settingArg, targetVal )
                     if ok then
-                        reportVal()
+                        reportVal( true )
                         return Logger.s( "Updated guild setting '"..settingArg.."' to '"..args[ 2 ].."' under instruction from user '"..userID.."' at guild '"..guildID.."'" )
                     else
                         Reporter.failure( message.channel, "Failed to update guild override", tostring( err ) )
