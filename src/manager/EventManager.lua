@@ -189,7 +189,7 @@ function EventManager:unpublishEvent( guildID, userID )
         return report( 2, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user's event is not published" ) )
     end
 
-    self:revokeFromRemote( guildID, userID )
+    coroutine.wrap( self.revokeFromRemote )( self, guildID, userID )
     event.published = nil
 
     self:saveEvents()
