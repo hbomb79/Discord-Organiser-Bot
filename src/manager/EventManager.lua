@@ -165,7 +165,7 @@ function EventManager:publishEvent( guildID, userID )
     end
 
     event.published = true
-    self:repairUserEvent( guildID, userID )
+    coroutine.wrap( self.repairUserEvent )( self, guildID, userID )
     self:saveEvents()
 
     return Logger.s( SUCCESS:format( "Published event", guildID, userID ) )
