@@ -56,7 +56,7 @@ function SettingsHandler:setOverride( guildID, property, value )
     local ok, err = type( config.predicate ) ~= "function" and true or config.predicate( self, guildID, value )
     if not ok then return false, err end
 
-    self.guilds[ guildID ][ property ] = value
+    guildConfig[ property ] = value
     self:saveGuilds()
 
     return true
