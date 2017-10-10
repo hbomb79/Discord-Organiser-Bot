@@ -1,5 +1,5 @@
-local discordia = luvitRequire "discordia"
 local Logger, Worker = require "src.util.Logger", require "src.lib.class".getClass "Worker"
+local discordia = luvitRequire "discordia"
 
 local function formResponses( client, responses )
 	local str, states = "", { {}, {}, {} }
@@ -21,9 +21,17 @@ local function formResponses( client, responses )
 	return str == "" and "*No RSVPs*" or str
 end
 
+local function verifyAndFetchChannel( self, guildID, userID )
+    local event = self:getEvent( guildID, userID )
+    local channelID = self.worker:getOverride( guildID, "channel" )
+    if not channelID then return end
+
+    local channel = self.worker.client:getGuild( guildID ):getChannel( channelID )
+    if not ( event and event.published and channel ) then return else return event, channel end
+end
 
 --[[
-    @instance pushing - table (def. {}) - A key-value pair table that is used to keep track of the guilds currently being pushed.
+    @instance repairing - table (def. {}) - A key-value pair table that is used to keep track of the guilds currently being repaired.
 
     An abstract class that is mixed-in by the EventManager class.
 
@@ -38,7 +46,8 @@ local RemoteHandler = class "RemoteHandler" {
     static = {
         ATTEND_REACTIONS = { "✅", "❔", "🚫" };
     };
-    -- XXX: pushing = {};
+
+    repairing = {};
 }
 
 --[[
@@ -47,24 +56,22 @@ local RemoteHandler = class "RemoteHandler" {
     @param <string - guildID>, <string - userID>
 ]]
 function RemoteHandler:revokeFromRemote( guildID, userID )
-    local event = self:getEvent( guildID, userID )
-    if not ( event and event.published ) then return end
-
-    local channelID = self.worker:getOverride( guildID, "channel" )
-    if not channelID then return end
-
-    local channel = self.worker.client:getGuild( guildID ):getChannel( channelID )
-    if not channel then return end
-
+    local event, channel = verifyAndFetchChannel( self, guildID, userID )
     if event.snowflake then
         local eventMessage = channel:getMessage( event.snowflake )
         if eventMessage then eventMessage:delete() end
+
+        event.snowflake = nil
     end
 
     if event.poll and event.poll.snowflake then
         local pollMessage = channel:getMessage( event.poll.snowflake )
         if pollMessage then pollMessage:delete() end
+
+        event.poll.snowflake = nil
     end
+
+    self.worker:saveGuilds()
 end
 
 --[[
@@ -80,9 +87,13 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
     for i = 1, #RemoteHandler.ATTEND_REACTIONS do
         local reaction = eventMessage.reactions:get( RemoteHandler.ATTEND_REACTIONS[ i ] )
         if not reaction then
-            eventMessage:addReaction( RemoteHandler.ATTEND_REACTIONS[ i ] )
+            if not eventMessage:addReaction( RemoteHandler.ATTEND_REACTIONS[ i ] ) then
+                return Logger.w "Reaction failed to add to message. Assuming message has been deleted. Bailing out"
+            end
         elseif reaction.count > 1 then
-            for user in reaction:getUsers():iter() do
+            local users = reaction:getUsers()
+            if not users then return Logger.w "Reaction missing from message. Assuming message has been deleted. Bailing out" end
+            for user in users:iter() do
                 if user.id ~= self.worker.client.user.id then reaction:delete( user.id ) end
             end
         end
@@ -141,15 +152,11 @@ end
     @param <string - guildID>, <string - userID>, [boolean - force]
 ]]
 function RemoteHandler:repairUserEvent( guildID, userID, force )
-    local event = self:getEvent( guildID, userID )
-    if not ( event and event.published ) then return end
+    local hash = guildID .. ":" .. userID
+    if self.repairing[ hash ] then return Logger.w( "Refusing to repair user event (hash: " .. hash .. ") because this user event is currently being repaired" ) end
+    self.repairing[ hash ] = true
 
-    local channelID = self.worker:getOverride( guildID, "channel" )
-    if not channelID then return end
-
-    local channel = self.worker.client:getGuild( guildID ):getChannel( channelID )
-    if not channel then return end
-
+    local event, channel = verifyAndFetchChannel( self, guildID, userID )
     if not ( event.snowflake and channel:getMessage( event.snowflake ) ) then
         local eventMessage = channel:send { embed = self:generateEmbed( guildID, userID ) }
         if not eventMessage then
@@ -178,6 +185,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     -- Repair the reactions attached to both event and poll messages (if present).
     self:repairReactions( guildID, userID, event, channel )
     self.worker:saveGuilds()
+    self.repairing[ hash ] = nil
     Logger.s( "Repaired user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
 end
 
