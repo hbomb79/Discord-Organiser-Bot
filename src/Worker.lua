@@ -128,12 +128,8 @@ function Worker:start()
     end )
     self.client:on( "channelCreate", function( channel )
         local guildConfig = self.guilds[ channel.guild.id ]
-        Logger.i "Created new channel"
         if not guildConfig._channel then
-            Logger.i "No fallback channel"
             local newChannel = self:setFallbackChannel( channel.guild )
-            Logger.i( tostring( newChannel.id ) )
-            Logger.i( tostring( guildConfig.channel ) )
             if newChannel and not guildConfig.channel then
                 Reporter.info( newChannel, "Event Organiser Channel Selection", "This channel has been automatically selected for the event organiser.\n\nIf you don't want this channel being used by the bot, use 'cmd settings channel #mention-chanel' to specify which channel the bot should use to announce events" )
             end
