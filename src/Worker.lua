@@ -69,6 +69,23 @@ end
 
 --[[
     @instance
+    @desc Sets the the fallback channel for the guild. This channel will be used
+          if the bot isn't configured to use a specific channel ('cmd settings channel')
+          OR if the specified channel becomes unavailable
+    @param <Discordia Guild Instance - guild>
+]]
+function Worker:setFallbackChannel( guild )
+    local guildConfig = self.guilds[ guild.id ]
+    local channelsArray = guild.textChannels:toArray()
+
+    guildConfig._channel = channelsArray[ 1 ] and channelsArray[ 1 ].id or nil
+    self:saveGuilds()
+
+    return channelsArray[ 1 ]
+end
+
+--[[
+    @instance
     @desc Finishes the construction of the Worker instance by creating the remaining event listeners
 ]]
 function Worker:start()
@@ -92,25 +109,34 @@ function Worker:start()
     self.client:on( "channelDelete", function( channel )
         local guildConfig = self.guilds[ channel.guild.id ]
         if guildConfig._channel == channel.id then
-            local channels = channel.guild.textChannels:toArray()
-            guildConfig._channel = channels[ 1 ] and channels[ 1 ].id or nil
-
-            if not channels[ 1 ] then return end
-            Reporter.warning( channels[ 1 ], "Event Organiser Channel Selection", "This channel has been automatically selected as a fallback channel for the event organiser.\n\nIf you don't want this channel being used by the bot, use 'cmd settings channel #mention-chanel' to specify which channel the bot should use to announce events" )
+            local newChannel = self:setFallbackChannel( channel.guild )
+            if not guildConfig.channel and newChannel then
+                Reporter.failure( newChannel, "Bot channel removed", "The configured channel for this bot has been deleted. The bot has fallen back to the automatically selected channel <#"..newChannel.id..">. Reconfigure the channel using 'cmd settings channel'." )
+            end
         end
 
-        if guildConfig.channel == channel.id then guildConfig.channel = nil end
+        if guildConfig.channel == channel.id then
+            guildConfig.channel = nil
+
+            local fallbackChannel = self:getOverride( channel.guild.id, "channel" )
+            if not fallbackChannel then return end
+
+            Reporter.failure( channel.guild:getChannel( fallbackChannel ), "Bot channel removed", "The configured channel for this bot has been deleted. The bot has fallen back to the automatically selected channel <#"..fallbackChannel..">. Reconfigure the channel using 'cmd settings channel'." )
+        end
 
         self:saveGuilds()
     end )
     self.client:on( "channelCreate", function( channel )
         local guildConfig = self.guilds[ channel.guild.id ]
+        Logger.i "Created new channel"
         if not guildConfig._channel then
-            local channels = channel.guild.textChannels:toArray()
-            guildConfig._channel = channels[ 1 ] and channels[ 1 ].id or nil
-
-            if not channels[ 1 ] then return end
-            Reporter.warning( channels[ 1 ], "Event Organiser Channel Selection", "This channel has been automatically selected as a fallback channel for the event organiser.\n\nIf you don't want this channel being used by the bot, use 'cmd settings channel #mention-chanel' to specify which channel the bot should use to announce events" )
+            Logger.i "No fallback channel"
+            local newChannel = self:setFallbackChannel( channel.guild )
+            Logger.i( tostring( newChannel.id ) )
+            Logger.i( tostring( guildConfig.channel ) )
+            if newChannel and not guildConfig.channel then
+                Reporter.info( newChannel, "Event Organiser Channel Selection", "This channel has been automatically selected for the event organiser.\n\nIf you don't want this channel being used by the bot, use 'cmd settings channel #mention-chanel' to specify which channel the bot should use to announce events" )
+            end
         end
 
         self:saveGuilds()
