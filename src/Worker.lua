@@ -191,8 +191,13 @@ function Worker:handleNewGuild( guild )
 
     local guilds, guildID = self.guilds, guild.id
     if not guilds[ guildID ] then
-        local channels = guild.textChannels:toArray()
-        guilds[ guildID ] = { events = {}, _channel = channels[ 1 ] and channels[ 1 ].id or nil }
+        guilds[ guildID ] = { events = {} }
+        local newChannel = self:setFallbackChannel( guild )
+
+        if newChannel then
+            guilds[ guildID ]._channel = newChannel and newChannel.id or nil
+            Reporter.info( newChannel, "Event Manager Channel", "The event manager bot has been invited to this guild and has automatically decided to use this channel for event information. Use 'cmd settings channel #mention-channel' to change the channel that the bot uses" )
+        end
 
         Logger.i( "New guild detected (or records of this guild have been lost)", guild.name, "This guild has been registered with the bot" )
         self:saveGuilds()
