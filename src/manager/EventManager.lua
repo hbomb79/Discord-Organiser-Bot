@@ -1,5 +1,7 @@
 local Reporter, Logger, Manager, RemoteHandler = require "src.util.Reporter", require "src.util.Logger", require "src.manager.Manager", require "src.util.RemoteHandler"
 
+local VALID_SETTINGS = { title = true, desc = true, location = true, timeframe = true }
+
 local REFUSE_ERROR, SUCCESS = "Refusing to %s at guild %s for user %s because %s", "%s at guild %s for user %s"
 local function report( code, ... )
     local _, reason = Logger.w( ... )
@@ -195,6 +197,30 @@ function EventManager:unpublishEvent( guildID, userID )
     self:saveEvents()
 
     return Logger.s( SUCCESS:format( "Unpublished event", guildID, userID ) )
+end
+
+--[[
+    @instance
+    @desc Sets the property to the value given on the event provided.
+
+          * Will fail for the following reasons -- user 'errorCode' to determine reason:
+            1: user doesn't own an event at this guild
+            2: property name is invalid
+    @param <string - guildID>, <string - userID>, <string - property>, <Any - value>
+    @return <boolean - success>, <string - output>, [number - errorCode]
+]]
+function EventManager:setEventProperty( guildID, userID, property, value )
+    local event = self:getEvent( guildID, userID )
+    if not event then
+        return report( 1, REFUSE_ERROR:format( "set event property", guildID, userID, "the user doesn't an event at this guild" ) )
+    elseif not VALID_SETTINGS[ property ] then
+        return report( 2, REFUSE_ERROR:format( "set event property", guildID, userID, "the setting provided '"..tostring( property ).."' is invalid. Valid settings: title, desc, location, timeframe." ) )
+    end
+
+    event[ property ] = value ~= "none" and value or nil
+    self:saveEvents( event )
+
+    return Logger.s( SUCCESS:format( "Set event property '"..property.."' to '"..value.."'", guildID, userID ) )
 end
 
 extends "Manager" mixin "RemoteHandler"

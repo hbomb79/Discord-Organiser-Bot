@@ -158,6 +158,21 @@ commands = {
         end
     },
 
+    set = {
+        action = function( evManager, guildID, userID, message )
+            local name, value = select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) ):match "(%S+)%s+(.+)$"
+            if not ( name and value ) then
+                return report( 1, "Invalid syntax given to set command. Should be form 'cmd set <property> <value>'" )
+            end
+
+            local ok, output, code = evManager:setEventProperty( guildID, userID, name, value )
+            if ok then return ok, output else return ok, output, 1 + ( code or 1 ) end
+        end,
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to set event property", reason )
+        end
+    },
+
     createPoll = {},
 
     setPollDesc = {},
