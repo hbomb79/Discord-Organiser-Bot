@@ -1,7 +1,7 @@
 local SettingsHandler
 local patternMatches = { ["^"] = "%^", ["$"] = "%$", ["("] = "%(", [")"] = "%)", ["%"] = "%%", ["*"] = "%*", ["."] = "%.", ["["] = "%[", ["]"] = "%]", ["+"] = "%+", ["-"] = "%-" }
 local function checkPrefix( worker, guildID, value )
-    if value == nil or ( #value >= 1 and #value <= 10 and not value:find "%s" ) then return value end
+    if value == nil or ( #value >= 1 and #value <= 10 and not value:find "%s" ) then return true end
 
     return false, "Prefix is invalid. Must be between 1-10 character long and contain no spaces"
 end
