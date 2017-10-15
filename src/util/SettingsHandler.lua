@@ -1,16 +1,14 @@
 local SettingsHandler
+local patternMatches = { ["^"] = "%^", ["$"] = "%$", ["("] = "%(", [")"] = "%)", ["%"] = "%%", ["*"] = "%*", ["."] = "%.", ["["] = "%[", ["]"] = "%]", ["+"] = "%+", ["-"] = "%-" }
 local function checkPrefix( worker, guildID, value )
-    if value == nil or ( #value >= 1 and #value <= 10 and not value:find "%s" ) then return true end
+    if value == nil or ( #value >= 1 and #value <= 10 and not value:find "%s" ) then return value end
 
     return false, "Prefix is invalid. Must be between 1-10 character long and contain no spaces"
 end
 
 local function checkChannel( worker, guildID, value )
     if value == nil then return true end
-
-    print( tostring( value ) )
     value = value:match "%<#(%w+)%>" or value
-    print( tostring( value ) )
 
     local guild = worker.client:getGuild( guildID )
     if not guild:getChannel( value ) then
@@ -29,6 +27,14 @@ local function checkGuildAndProperty( worker, guildID, property )
     end
 
     return guildConfig, config
+end
+
+local function getProperty( worker, guildID, property )
+    local guildConfig, config = checkGuildAndProperty( worker, guildID, property )
+    if not guildConfig then return false end
+
+    local fallbackProperty = type( config.useFallback ) == "string" and config.useFallback or "_" .. property
+    return guildConfig[ property ] or ( config.useFallback and guildConfig[ fallbackProperty ] ) or config.default, config
 end
 
 --[[
@@ -56,10 +62,11 @@ SettingsHandler = class "SettingsHandler" {
                 help = "",
                 default = "!",
                 predicate = checkPrefix,
+                get = function( _, __, val ) return val and val:gsub( ".", patternMatches ) or val end
             },
             channel = {
                 help = "",
-                useFallback = true, --TODO: Track default channel in guild
+                useFallback = true,
                 predicate = checkChannel,
                 show = function( _, __, val ) return "<#" .. val .. ">" end
             }
@@ -103,11 +110,12 @@ end
     @return <boolean - succcess>, <string - failureReason> - Returns false and the reason if it couldn't search for value
 ]]
 function SettingsHandler:getOverride( guildID, property )
-    local guildConfig, config = checkGuildAndProperty( self, guildID, property )
-    if not guildConfig then return false, config end
+    local ret, config = getProperty( self, guildID, property )
+    if not ( ret and config ) then return ret, config end
 
-    local fallbackProperty = type( config.useFallback ) == "string" and config.useFallback or "_" .. property
-    return guildConfig[ property ] or ( config.useFallback and guildConfig[ fallbackProperty ] ) or config.default
+    if type( config.get ) == "function" then return config.get( self, guildID, ret ) end
+
+    return ret
 end
 
 --[[
@@ -115,14 +123,22 @@ end
     @desc Returns the value for the guild override in a user
           readable way by using the 'show' method attached
           to the setting type
-    @param <string - guildID>, <string - property>
-]]
-function SettingsHandler:getOverrideForDisplay( guildID, property )
-    local val, reason = self:getOverride( guildID, property )
-    if not val then return false, reason end
 
-    local config = SettingsHandler.SETTINGS[ property ]
-    return type( config.show ) == "function" and config.show( self, guildID, val ) or ("'%s'"):format( val )
+          It's important to note that this function does NOT
+          use the properties 'get' method unless told to
+          via arg #3 (useGetter)
+    @param <string - guildID>, <string - property>, [boolean - useGetter]
+]]
+function SettingsHandler:getOverrideForDisplay( guildID, property, useGetter )
+    local ret, config = getProperty( self, guildID, property )
+    if not ( ret and config ) then return ret, config end
+
+    if useGetter and type( config.get ) == "function" then ret = config.get( self, guildID, ret ) end
+    if type( config.show ) == "function" then
+        return config.show( self, guildID, ret )
+    end
+
+    return ret
 end
 
 --[[
