@@ -89,7 +89,19 @@ end
     @desc Finishes the construction of the Worker instance by creating the remaining event listeners
 ]]
 function Worker:start()
-    -- self.client:on( "reactionAdd", function( reaction, userID ) self.messageManager:handleInboundReaction( reaction, userID ) end )
+    local function addReactionToQueue( reaction, userID )
+        local guildID = reaction.message.guild.id
+        if guildID and self.guilds[ guildID ] and not self.client:getUser( userID ).bot then
+            self:addToQueue( reaction, userID )
+        end
+    end
+
+    self.client:on( "reactionAddUncached", function( channel, messageID, hash, userID )
+        addReactionToQueue( channel:getMessage( messageID ).reactions:get( hash ), userID )
+    end )
+    self.client:on( "reactionAdd", function( reaction, userID )
+        addReactionToQueue( reaction, userID )
+    end )
     self.client:on( "messageCreate", function( message )
         local guildID = message.guild and message.guild.id
         if message.author.bot or not ( guildID and self.guilds[ guildID ] ) or not ( message.content and message.content:find( "^".. self:getOverride( guildID, "prefix" ) .."%w+" ) ) then return end
@@ -199,9 +211,8 @@ function Worker:addToQueue( target, userID )
     elseif discordia.class.isInstance( target, discordia.class.classes.Reaction ) then
         if not userID then return Logger.w( "Cannot add Reaction to worker queue because no userID was provided (arg #2)" ) end
 
-        -- table.insert( self.queue, { target, userID } )
-        print "Cannot add reaction based commands to queue; NYI"
-        return false
+        Logger.i "Adding reaction to queue"
+        table.insert( self.queue, { target, userID } )
     else
         return Logger.w( "Unknown target '"..tostring( target ).."' for worker queue" )
     end
@@ -223,18 +234,13 @@ function Worker:checkQueue()
     self.working = true
     while #queue > 0 do
         local item = queue[ 1 ]
-        local ok, state = self.commandManager:handleItem( item )
-        if ok then
-            Logger.s( "Executed '"..item.content.."' command for user '"..item.author.fullname.."'" )
-        elseif state == 1 then
-            Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the command doesn't exist" )
-        elseif state == 2 then
-            Logger.w( "Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' because the member doesn't have the correct set of permissions" )
-        else
-            Logger.e( "Unhandled exception caught. Failed to execute command '"..item.content.."' for user '"..item.author.fullname.."' for an unknown reason", tostring( state ) )
-        end
+        self.commandManager:handleItem( item )
 
-        self.userCommandRequests[ item.author.id ] = self.userCommandRequests[ item.author.id ] - 1
+        local authorID = item.author and item.author.id or item[ 2 ]
+
+        local reqs = self.userCommandRequests[ authorID ]
+        if reqs then self.userCommandRequests[ authorID ] = reqs - 1 end
+
         table.remove( queue, 1 )
     end
 

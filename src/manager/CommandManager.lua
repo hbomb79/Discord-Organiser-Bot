@@ -28,11 +28,11 @@ local CommandManager = class "CommandManager" {
     @return <false - status>, <string - error> - If the command execution failed for an unknown reason (unable to provide status code) the warning/error log will be returned
 ]]
 function CommandManager:handleItem( item )
-    if type( item ) == "table" and ( discordia.class.type( item ) == "Message" or discordia.class.type( item ) == "Reaction" ) then
+    if type( item ) == "table" and ( discordia.class.type( item ) == "Message" or discordia.class.type( item[ 1 ] ) == "Reaction" ) then
         if discordia.class.type( item ) == "Message" then
             return self:handleMessage( item )
         else
-            return Logger.w "Item provided is a reaction. The bot is unable to process reaction-based commands (NYI)"
+            return self:handleReaction( unpack( item ) )
         end
     else
         return Logger.w( "Item provided '"..tostring( item ).."' for handling is INVALID. *Must* be a Discordia Message/Reaction instance" )
@@ -50,12 +50,36 @@ end
     @return <string - commandName>, <string - commandArg> - If valid syntax
 ]]
 function CommandManager:splitCommand( guildID, commandString )
-    local guildPrefix = self.worker.guilds[ guildID ].prefix or "!"
-    local commandName, trailing = commandString:match( "^" .. guildPrefix .. "(%w+)(.*)" )
+    local commandName, trailing = commandString:match( "^" .. self.worker:getOverride( guildID, "prefix" ) .. "(%w+)(.*)" )
 
     if not commandName then return end
-
     return commandName, trailing
+end
+
+--[[
+    @instance
+    @desc Continues item handling (if reaction) by checking that the reaction
+          was added to a valid message, and calling the action attached to that
+          reaction type.
+
+          If fails to handle reaction the function returns 'false' and an error code,
+          where error code could be:
+            1: reaction added to invalid message (pushed events in guild have snowflakes that don't match)
+    @param <Discordia Reaction Instance - reaction>, <string - userID>
+    @return <boolean - success>, [number - errorCode]
+]]
+function CommandManager:handleReaction( reaction, userID )
+    local messageSnowflake, guildID = reaction.message.id, reaction.guild.id
+    local publishedEvents = self.worker.eventManager:getPublishedEvents( guildID )
+
+    for e = 1, #publishedEvents do
+        local event = publishedEvents[ e ]
+        if event.snowflake == messageSnowflake then
+            -- RSVP
+        elseif event.poll and event.poll.snowflake == messageSnowflake then
+            -- Poll vote
+        end
+    end
 end
 
 --[[
@@ -71,9 +95,9 @@ function CommandManager:handleMessage( message )
     local com = self.commands[ commandName ]
 
     if not ( com and com.action ) then
-        return false, 1
+        return Logger.w( "Command '" .. commandName .. "' doesn't exist, unable to execute command" )
     elseif com.permissions then
-        if not message.member:getPermissions():has( unpack( com.permissions ) ) then return false, 2 end
+        if not message.member:getPermissions():has( unpack( com.permissions ) ) then return Logger.w( "Command '"..commandName.."' requires permissions which the user doesn't have" ) end
     end
 
     return self:executeCommand( commandName, message )
