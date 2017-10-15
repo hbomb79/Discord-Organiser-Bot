@@ -119,6 +119,8 @@ function Worker:start()
     self.client:on( "guildCreate", function( guild ) self:handleNewGuild( guild ) end )
     self.client:on( "guildDelete", function( guild ) if self.guilds[ guild.id ] then self.guilds[ guild.id ] = nil; self:saveGuilds() end end )
     self.client:on( "channelDelete", function( channel )
+        if not channel.guild then return end
+
         local guildConfig = self.guilds[ channel.guild.id ]
         if guildConfig._channel == channel.id then
             local newChannel = self:setFallbackChannel( channel.guild )
@@ -139,6 +141,8 @@ function Worker:start()
         self:saveGuilds()
     end )
     self.client:on( "channelCreate", function( channel )
+        if not channel.guild then return end
+
         local guildConfig = self.guilds[ channel.guild.id ]
         if not guildConfig._channel then
             local newChannel = self:setFallbackChannel( channel.guild )
