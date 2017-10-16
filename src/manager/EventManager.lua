@@ -223,5 +223,37 @@ function EventManager:setEventProperty( guildID, userID, property, value )
     return Logger.s( SUCCESS:format( "Set event property '"..property.."' to '"..value.."'", guildID, userID ) )
 end
 
+--[[
+    @instance
+    @desc Sets the attending state of the user provided to the level provided
+          on the event published at guild/user provided.
+
+          * Will fail for the following reasons -- use 'errorCode' to determine reason:
+            1: user doesn't own an event at this guild
+            2: event selected is not published
+            3: responding user state is invalid
+            4: responding user has already responded using the same state
+    @param <string - guildID>, <string - userID>, <string - respondingUserID>, <number - respondingUserState>
+    @return <boolean - success>, <string - output>, [number - errorCode]
+]]
+function EventManager:respondToEvent( guildID, userID, respondingUserID, respondingUserState )
+    local event = self:getEvent( guildID, userID )
+    if not event then
+        return report( 1, REFUSE_ERROR:format( "respond to event", guildID, userID, "the user doesn't have an event at this guild" ) )
+    elseif not event.published then
+        return report( 2, REFUSE_ERROR:format( "respond to event", guildID, userID, "the users event is not published" ) )
+    elseif not ( type( respondingUserState ) == "number" and respondingUserState >= 0 and respondingUserState <= 2 ) then
+        return report( 3, REFUSE_ERROR:format( "respond to event", guildID, userID, "the responding state is invalid. Can only be 0 (not attending), 1 (maybe attending), or 2 (is attending). Received: " .. tostring( respondingUserState ) ) )
+    elseif event.responses[ respondingUserID ] == respondingUserState then
+        return report( 4, REFUSE_ERROR:format( "respond to event", guildID, userID, "the responding user has already responded using the same responding state ("..respondingUserState..")" ) )
+    end
+
+    event.responses[ respondingUserID ] = respondingUserState
+    self:saveEvents( event )
+    coroutine.wrap( self.repairUserEvent )( self, guildID, userID )
+
+    return Logger.s( SUCCESS:format( "Responded to event (for user '"..respondingUserID.."' as state '"..respondingUserState.."')", guildID, userID ) )
+end
+
 extends "Manager" mixin "RemoteHandler"
 return EventManager:compile()

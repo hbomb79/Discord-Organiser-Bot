@@ -221,6 +221,7 @@ function Worker:addToQueue( target, userID )
         if not userID then return Logger.w( "Cannot add Reaction to worker queue because no userID was provided (arg #2)" ) end
 
         Logger.i "Adding reaction to queue"
+        target:delete( userID )
         table.insert( self.queue, { target, userID } )
     else
         return Logger.w( "Unknown target '"..tostring( target ).."' for worker queue" )

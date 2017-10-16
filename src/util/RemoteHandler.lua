@@ -155,7 +155,7 @@ end
 ]]
 function RemoteHandler:repairUserEvent( guildID, userID, force )
     local hash = guildID .. ":" .. userID
-    if self.repairing[ hash ] then return Logger.w( "Refusing to repair user event (hash: " .. hash .. ") because this user event is currently being repaired" ) end
+    -- if self.repairing[ hash ] then return Logger.w( "Refusing to repair user event (hash: " .. hash .. ") because this user event is currently being repaired" ) end
     self.repairing[ hash ] = true
 
     local event, channel = verifyAndFetchChannel( self, guildID, userID )
@@ -186,7 +186,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     end
 
     -- Repair the reactions attached to both event and poll messages (if present).
-    self:repairReactions( guildID, userID, event, channel )
+    coroutine.wrap( self.repairReactions )( self, guildID, userID, event, channel )
     self.worker:saveGuilds()
     self.repairing[ hash ] = nil
     Logger.s( "Repaired user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )

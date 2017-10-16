@@ -6,6 +6,10 @@ local discordia = luvitRequire "discordia"
     command handling capabilities (the execution of commands).
 ]]
 local CommandManager = class "CommandManager" {
+    static = {
+        REACTION_ATTENDANCE_CODES = { ["✅"] = 2, ["❔"] = 1, ["🚫"] = 0 }
+    };
+
     commands = require "src.lib.commands"
 }
 
@@ -69,15 +73,18 @@ end
     @return <boolean - success>, [number - errorCode]
 ]]
 function CommandManager:handleReaction( reaction, userID )
-    local messageSnowflake, guildID = reaction.message.id, reaction.guild.id
+    local messageSnowflake, guildID = reaction.message.id, reaction.message.guild.id
     local publishedEvents = self.worker.eventManager:getPublishedEvents( guildID )
 
     for e = 1, #publishedEvents do
         local event = publishedEvents[ e ]
         if event.snowflake == messageSnowflake then
-            -- RSVP
+            local code = CommandManager.REACTION_ATTENDANCE_CODES[ reaction.emojiName ]
+            if not code then return Logger.w( "Failed to handle reaction. Reaction change on event message doesn't match the three attendance types available. Emoji name: " .. tostring( reaction.emojiName ) .. " not recognised" ) end
+
+            self.worker.eventManager:respondToEvent( guildID, event.author, userID, code )
         elseif event.poll and event.poll.snowflake == messageSnowflake then
-            -- Poll vote
+            --TODO Poll vote
         end
     end
 end
