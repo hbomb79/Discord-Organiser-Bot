@@ -159,7 +159,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     self.repairing[ hash ] = true
 
     local event, channel = verifyAndFetchChannel( self, guildID, userID )
-    if not event then return end
+    if not ( event and event.published ) then return end
     if not ( event.snowflake and channel:getMessage( event.snowflake ) ) then
         local eventMessage = channel:send { embed = self:generateEmbed( guildID, userID ) }
         if not eventMessage then
