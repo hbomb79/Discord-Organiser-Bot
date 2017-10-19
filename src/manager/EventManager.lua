@@ -219,6 +219,7 @@ function EventManager:setEventProperty( guildID, userID, property, value )
 
     event[ property ] = value ~= "none" and value or nil
     self:saveEvents( event )
+    coroutine.wrap( self.repairUserEvent )( self, guildID, userID )
 
     return Logger.s( SUCCESS:format( "Set event property '"..property.."' to '"..value.."'", guildID, userID ) )
 end
