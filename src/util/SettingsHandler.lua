@@ -1,4 +1,4 @@
-local SettingsHandler
+local Logger, SettingsHandler = require "src.util.Logger"
 local patternMatches = { ["^"] = "%^", ["$"] = "%$", ["("] = "%(", [")"] = "%)", ["%"] = "%%", ["*"] = "%*", ["."] = "%.", ["["] = "%[", ["]"] = "%]", ["+"] = "%+", ["-"] = "%-" }
 local function checkPrefix( worker, guildID, value )
     if value == nil or ( #value >= 1 and #value <= 10 and not value:find "%s" ) then return true end
@@ -68,7 +68,22 @@ SettingsHandler = class "SettingsHandler" {
                 help = "",
                 useFallback = true,
                 predicate = checkChannel,
-                show = function( _, __, val ) return "<#" .. val .. ">" end
+                show = function( _, __, val ) return "<#" .. val .. ">" end,
+                preSet = function( self, guildID, old, new )
+                    if not old then return end
+
+                    local events = self.guilds[ guildID ].events
+                    Logger.i "Revoking events from old channel"
+                    for userID in pairs( events ) do
+                        self.eventManager:revokeFromRemote( guildID, userID )
+                    end
+                    Logger.i "Revoked"
+                end,
+                postSet = function( self, guildID, channel )
+                    if not channel then return end
+
+                    self.eventManager:repairGuild( guildID )
+                end
             }
         };
     }
@@ -86,13 +101,25 @@ function SettingsHandler:setOverride( guildID, property, value )
     local guildConfig, config = checkGuildAndProperty( self, guildID, property )
     if not guildConfig then return false, config end
 
+    local function set( property, val )
+        Logger.i "Setting"
+        if type( config.preSet ) == "function" then
+            config.preSet( self, guildID, guildConfig[ property ], val )
+            Logger.i "Notified"
+        end
+
+        guildConfig[ property ] = val
+        Logger.s "Set"
+
+        if type( config.postSet ) == "function" then config.postSet( self, guildID, val ) end
+    end
     if type( config.predicate ) == "function" then
         local ok, err = config.predicate( self, guildID, value )
         if not ok then return false, err end
 
-        guildConfig[ property ] = ok ~= true and ok or value
+        set( property, ok ~= true and ok or value )
     else
-        guildConfig[ property ] = value
+        set( property, value )
     end
 
     self:saveGuilds()
