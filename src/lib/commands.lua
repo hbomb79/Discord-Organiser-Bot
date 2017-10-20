@@ -193,7 +193,13 @@ commands = {
 
     view = {},
 
-    refreshRemote = {}, -- ADMIN
+    repairGuild = {
+        action = function( evManager, guildID, userID, message )
+            evManager:repairGuild( guildID, true )
+            return true, "Repairing all events at guild '" .. guildID .. "'"
+        end,
+        permissions = { perms.manageEmojis, perms.manageMessages }
+    },
 
     revokeRemote = {}, -- ADMIN
 

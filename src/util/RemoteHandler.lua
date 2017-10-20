@@ -189,7 +189,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     coroutine.wrap( self.repairReactions )( self, guildID, userID, event, channel )
     self.worker:saveGuilds()
     self.repairing[ hash ] = nil
-    Logger.s( "Repaired user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
+    return Logger.s( "Repaired user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
 end
 
 --[[
