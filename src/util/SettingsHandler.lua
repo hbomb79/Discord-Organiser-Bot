@@ -73,11 +73,9 @@ SettingsHandler = class "SettingsHandler" {
                     if not old then return end
 
                     local events = self.guilds[ guildID ].events
-                    Logger.i "Revoking events from old channel"
                     for userID in pairs( events ) do
                         self.eventManager:revokeFromRemote( guildID, userID )
                     end
-                    Logger.i "Revoked"
                 end,
                 postSet = function( self, guildID, channel )
                     if not channel then return end
@@ -102,15 +100,8 @@ function SettingsHandler:setOverride( guildID, property, value )
     if not guildConfig then return false, config end
 
     local function set( property, val )
-        Logger.i "Setting"
-        if type( config.preSet ) == "function" then
-            config.preSet( self, guildID, guildConfig[ property ], val )
-            Logger.i "Notified"
-        end
-
+        if type( config.preSet ) == "function" then config.preSet( self, guildID, guildConfig[ property ], val ) end
         guildConfig[ property ] = val
-        Logger.s "Set"
-
         if type( config.postSet ) == "function" then config.postSet( self, guildID, val ) end
     end
     if type( config.predicate ) == "function" then
@@ -118,9 +109,7 @@ function SettingsHandler:setOverride( guildID, property, value )
         if not ok then return false, err end
 
         set( property, ok ~= true and ok or value )
-    else
-        set( property, value )
-    end
+    else set( property, value ) end
 
     self:saveGuilds()
     return true

@@ -196,26 +196,14 @@ commands = {
     repairGuild = {
         action = function( evManager, guildID, userID, message )
             evManager:repairGuild( guildID, true )
-            return true, "Repairing all events at guild '" .. guildID .. "'"
+            return Logger.s( "Repairing all events at guild '" .. guildID .. "'" )
         end,
         permissions = { perms.manageEmojis, perms.manageMessages }
     },
-
-    revokeRemote = {}, -- ADMIN
 
     banUser = {}, -- ADMIN
 
     unbanUser = {} -- ADMIN
 }
-
--- Generate commands dynamically for the following properties. The function will simply change the property key-value of the users event.
---local VALID_FIELDS = { "title", "desc", "timeframe", "location" }
---for i = 1, #VALID_FIELDS do
-    --local field = VALID_FIELDS[ i ]
-
-    --local name = field:sub( 1, 1 ):upper() .. field:sub( 2 )
-    --commands[ "set" .. name ] = {}
-    --commands[ "get" .. name ] = {}
---end
 
 return commands
