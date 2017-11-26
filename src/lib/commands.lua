@@ -185,17 +185,36 @@ commands = {
 
     deletePoll = {},
 
-    yes = {},
-
-    maybe = {},
-
-    no = {},
-
     view = {},
 
-    refreshRemote = {}, -- ADMIN
+    repairGuild = {
+        permissions = {},
+        action = function( evManager, guildID, userID, message )
 
-    revokeRemote = {}, -- ADMIN
+        end
+    },
+
+    revokeRemote = {
+        permissions = {},
+        action = function( evManager, guildID, _userID, message, args )
+            -- Remove any surrounding elements of the userID (@<>).
+            local userID = tostring( splitArguments( select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) ) )[ 1 ] ):gsub( "%<@(%w+)%>", "%1" )
+            if not userID then
+                return report( 1, "Invalid command syntax. Requires userID following command start (tag user/provide userID from debug)." )
+            elseif not evManager.worker.client.users:get( userID ) then
+                return report( 2, "Invalid userID provided -- unable to find user with matching ID in client's cache" )
+            end
+
+            local event = evManager:getEvent( guildID, userID )
+            if not ( event and event.published ) then return report( 3, "Unable to revoke event for user " .. userID .. " -- user has no event published at guild " .. guildID ) end
+
+            local ok, output, code = evManager:unpublishEvent( guildID, userID )
+            if ok then return ok, output else return ok, output, 1 + ( code or 1 ) end
+        end,
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to revoke remote", reason )
+        end
+    },
 
     banUser = {}, -- ADMIN
 
