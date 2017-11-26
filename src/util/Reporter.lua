@@ -13,7 +13,7 @@ Logger.d "Compiling Reporter"
 local Reporter = class "Reporter" {
     static = {
         modes = {
-            info = discordia.Color.fromRGB(114, 137, 218 ).value;
+            info = discordia.Color.fromRGB( 114, 137, 218 ).value;
             success = discordia.Color.fromRGB( 14, 199, 100 ).value;
             warning = discordia.Color.fromRGB( 219, 145, 15 ).value;
             failure = discordia.Color.fromRGB( 219, 36, 15 ).value;
@@ -28,6 +28,7 @@ function Reporter.static.send( target, colour, title, description, ... )
         description = Logger.worker:resolveNames( description, prefix )
 
         for i = 1, #f do
+            f[ i ].name = Logger.worker:resolveNames( f[ i ].name, prefix )
             f[ i ].value = Logger.worker:resolveNames( f[ i ].value, prefix )
         end
     end
