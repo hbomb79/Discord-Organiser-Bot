@@ -159,7 +159,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     self.repairing[ hash ] = true
 
     local event, channel = verifyAndFetchChannel( self, guildID, userID )
-    if not event then return end
+    if not ( event and event.published ) then return end
     if not ( event.snowflake and channel:getMessage( event.snowflake ) ) then
         local eventMessage = channel:send { embed = self:generateEmbed( guildID, userID ) }
         if not eventMessage then
@@ -189,7 +189,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     coroutine.wrap( self.repairReactions )( self, guildID, userID, event, channel )
     self.worker:saveGuilds()
     self.repairing[ hash ] = nil
-    Logger.s( "Repaired user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
+    return Logger.s( "Repaired user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
 end
 
 --[[
