@@ -86,6 +86,7 @@ commands = {
     },
 
     settings = {
+        help = "Used in syntax 'cmd settings settingName settingValue'. If no 'settingName', all settings for the guild (and their value) will be shown (along with more indepth help information).",
         action = function( eventManager, guildID, userID, message )
             local args = splitArguments( select( 2, eventManager.worker.commandManager:splitCommand( guildID, message.content ) ) )
             local guildConfig = eventManager.worker.guilds[ guildID ]
@@ -131,6 +132,7 @@ commands = {
     },
 
     create = {
+        help = "Creates a new event. A user can only have one event *per guild*. An event must be created before one can be edited (and then published).",
         action = "createEvent",
         onFailure = function( eventManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to create event", reason )
@@ -138,6 +140,7 @@ commands = {
     },
 
     delete = {
+        help = "Deletes the user's event at this guild (if one exists). This action is non-reversible and will erase all event details (including RSVPs -- members that have responded will be notified that the event has been cancelled)",
         action = "deleteEvent",
         onFailure = function( eventManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to delete event", reason )
@@ -145,6 +148,7 @@ commands = {
     },
 
     publish = {
+        help = "Publishes the current event to the guild. This allows members to RSVP. Ensure your event details are correct before publishing to avoid confusion.",
         action = "publishEvent",
         onFailure = function( evManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to publish event", reason )
@@ -152,6 +156,7 @@ commands = {
     },
 
     unpublish = {
+        help = "Unpublishes your event from the guild. Members who have RSVPed will be notified that the event is cancelled (and all responses will be erased). There is no need to unpublish your event when editing details.",
         action = "unpublishEvent",
         onFailure = function( evManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to unpublish event", reason )
@@ -159,6 +164,7 @@ commands = {
     },
 
     set = {
+        help = "Syntax: 'cmd set property value'.\n\nSets the property (valid properties: title, desc, location, timeframe) to the value given",
         action = function( evManager, guildID, userID, message )
             local name, value = select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) ):match "(%S+)%s+(.+)$"
             if not ( name and value ) then
@@ -188,7 +194,7 @@ commands = {
     view = {},
 
     revokeRemote = {
-        permissions = {},
+        help = "\\*Admin Command* Syntax: 'cmd revokeRemote @tagUser'\n\nForcibly unpublishes the event by the tagged user (alternatively, the userID can be plainly provided instead of tagging the user).",
         action = function( evManager, guildID, _userID, message, args )
             -- Remove any surrounding elements of the userID (@<>).
             local userID = tostring( splitArguments( select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) ) )[ 1 ] ):gsub( "%<@(%w+)%>", "%1" )
@@ -206,10 +212,12 @@ commands = {
         end,
         onFailure = function( evManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to revoke remote", reason )
-        end
+        end,
+        permissions = { perms.manageMessages, perms.manageEmojis }
     },
 
     repairGuild = {
+        help = "\\*Admin Command* Repairs the remote of the guild, causing the pushed messages to be reset",
         action = function( evManager, guildID, userID, message )
             evManager:repairGuild( guildID, true )
             return Logger.s( "Repairing all events at guild '" .. guildID .. "'" )
