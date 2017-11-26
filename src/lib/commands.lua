@@ -40,7 +40,7 @@ commands = {
                             Logger.d( "Serving help for cmd " .. com )
 
                             if h and #h > 0 then
-                                fields[ #fields + 1 ] = { name = "'cmd ".. com .. "'", value = h }
+                                fields[ #fields + 1 ] = { name = "__'cmd ".. com .. "'__", value = h }
                             end
                         else
                             Logger.w( "Help information not available for "..com )
@@ -65,7 +65,7 @@ commands = {
                     local fields = {}
                     for name, config in pairs( commands ) do
                         if config.help and #config.help > 0 then
-                            fields[ #fields + 1 ] = { name = "'cmd " .. name .. "'", value = config.help }
+                            fields[ #fields + 1 ] = { name = "__'cmd " .. name .. "'__", value = config.help }
                         end
                     end
 
