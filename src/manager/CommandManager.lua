@@ -79,6 +79,8 @@ function CommandManager:handleReaction( reaction, userID )
     for e = 1, #publishedEvents do
         local event = publishedEvents[ e ]
         if event.snowflake == messageSnowflake then
+            reaction:delete( userID )
+
             local code = CommandManager.REACTION_ATTENDANCE_CODES[ reaction.emojiName ]
             if not code then return Logger.w( "Failed to handle reaction. Reaction change on event message doesn't match the three attendance types available. Emoji name: " .. tostring( reaction.emojiName ) .. " not recognised" ) end
 
