@@ -229,15 +229,18 @@ end
     @desc Sets the attending state of the user provided to the level provided
           on the event published at guild/user provided.
 
+          If 'noUpdate', the event that has been responded to will NOT be repaired (repairUserEvent should
+          be called manually to ensure proper display of message now that RSVPs may have changed).
+
           * Will fail for the following reasons -- use 'errorCode' to determine reason:
             1: user doesn't own an event at this guild
             2: event selected is not published
             3: responding user state is invalid
             4: responding user has already responded using the same state
-    @param <string - guildID>, <string - userID>, <string - respondingUserID>, <number - respondingUserState>
+    @param <string - guildID>, <string - userID>, <string - respondingUserID>, <number - respondingUserState>, [boolean - noUpdate]
     @return <boolean - success>, <string - output>, [number - errorCode]
 ]]
-function EventManager:respondToEvent( guildID, userID, respondingUserID, respondingUserState )
+function EventManager:respondToEvent( guildID, userID, respondingUserID, respondingUserState, noUpdate )
     local event = self:getEvent( guildID, userID )
     if not event then
         return report( 1, REFUSE_ERROR:format( "respond to event", guildID, userID, "the user doesn't have an event at this guild" ) )
@@ -251,7 +254,7 @@ function EventManager:respondToEvent( guildID, userID, respondingUserID, respond
 
     event.responses[ respondingUserID ] = respondingUserState
     self:saveEvents( event )
-    coroutine.wrap( self.repairUserEvent )( self, guildID, userID )
+    if not noUpdate then coroutine.wrap( self.repairUserEvent )( self, guildID, userID ) end
 
     return Logger.s( SUCCESS:format( "Responded to event (for user '"..respondingUserID.."' as state '"..respondingUserState.."')", guildID, userID ) )
 end
