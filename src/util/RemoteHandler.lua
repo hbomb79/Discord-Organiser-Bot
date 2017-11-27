@@ -106,13 +106,16 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
         end
     end
 
-    if not next( accumulatedReactions ) then return end
-    Logger.i "Resolving accumulated reactions (RSVPs while bot was offline)"
+    if next( accumulatedReactions ) then
+        local count, evManager = 0, self.worker.eventManager
+        for userID, code in pairs( accumulatedReactions ) do
+            evManager:respondToEvent( guildID, event.author, userID, code, true )
+            Reporter.info( self.worker.client:getUser( userID ):getPrivateChannel(), "RSVP Applied", "You RSVPd to an event while this bot was offline (event **"..event.title.."**, authored by user "..event.author.." in guild "..guildID..").\n\nYour RSVP was found on bot startup has been applied (set RSVP state to **"..tostring( Worker.ATTEND_ENUM[ code + 1 ] ).."**)" )
+            count = count + 1
+        end
 
-    local evManager = self.worker.eventManager
-    for userID, code in pairs( accumulatedReactions ) do
-        evManager:respondToEvent( guildID, event.author, userID, code )
-        Reporter.info( self.worker.client:getUser( userID ):getPrivateChannel(), "RSVP Applied", "You RSVPd to an event while this bot was offline (event **"..event.title.."**, authored by user "..event.author.." in guild "..guildID..").\n\nYour RSVP was found on bot startup has been applied (set RSVP state to '"..tostring( Worker.ATTEND_ENUM[ code + 1 ] ).."')" )
+        coroutine.wrap( evManager.repairUserEvent )( self, guildID, userID )
+        Logger.s( "Resolved " .. count .. " offline RSVPs for event at guild " .. guildID .. " for user " .. userID .. " -- repairing event" )
     end
 end
 
@@ -169,8 +172,6 @@ end
 ]]
 function RemoteHandler:repairUserEvent( guildID, userID, force )
     local hash = guildID .. ":" .. userID
-    -- if self.repairing[ hash ] then return Logger.w( "Refusing to repair user event (hash: " .. hash .. ") because this user event is currently being repaired" ) end
-    self.repairing[ hash ] = true
 
     local event, channel = verifyAndFetchChannel( self, guildID, userID )
     if not ( event and event.published ) then return end
@@ -202,8 +203,8 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     -- Repair the reactions attached to both event and poll messages (if present).
     coroutine.wrap( self.repairReactions )( self, guildID, userID, event, channel )
     self.worker:saveGuilds()
-    self.repairing[ hash ] = nil
-    return Logger.s( "Repaired user event (on remote) at guild '"..guildID.."' for user '"..userID.."'" )
+
+    return true
 end
 
 --[[
