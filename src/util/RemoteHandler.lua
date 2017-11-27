@@ -1,4 +1,4 @@
-local Logger, Worker = require "src.util.Logger", require "src.lib.class".getClass "Worker"
+local Logger, Reporter, Worker, CommandManager = require "src.util.Logger", require "src.util.Reporter", require "src.lib.class".getClass "Worker", require "src.lib.class".getClass "CommandManager"
 local discordia = luvitRequire "discordia"
 
 local function formResponses( client, responses )
@@ -86,6 +86,7 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
     local eventMessage = channel:getMessage( event.snowflake )
     if not eventMessage then return Logger.e( "Cannot repair reactions on event message because the message doesn't exist at the snowflake on record" ) end
 
+    local accumulatedReactions = {}
     for i = 1, #RemoteHandler.ATTEND_REACTIONS do
         local reaction = eventMessage.reactions:get( RemoteHandler.ATTEND_REACTIONS[ i ] )
         if not reaction then
@@ -96,9 +97,22 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
             local users = reaction:getUsers()
             if not users then return Logger.w "Reaction missing from message. Assuming message has been deleted. Bailing out" end
             for user in users:iter() do
-                if user.id ~= self.worker.client.user.id then reaction:delete( user.id ) end
+                if user.id ~= self.worker.client.user.id then
+                    accumulatedReactions[ user.id ] = CommandManager.REACTION_ATTENDANCE_CODES[ reaction.emojiName ]
+
+                    reaction:delete( user.id )
+                end
             end
         end
+    end
+
+    if not next( accumulatedReactions ) then return end
+    Logger.i "Resolving accumulated reactions (RSVPs while bot was offline)"
+
+    local evManager = self.worker.eventManager
+    for userID, code in pairs( accumulatedReactions ) do
+        evManager:respondToEvent( guildID, event.author, userID, code )
+        Reporter.info( self.worker.client:getUser( userID ):getPrivateChannel(), "RSVP Applied", "You RSVPd to an event while this bot was offline (event **"..event.title.."**, authored by user "..event.author.." in guild "..guildID..").\n\nYour RSVP was found on bot startup has been applied (set RSVP state to '"..tostring( Worker.ATTEND_ENUM[ code + 1 ] ).."')" )
     end
 end
 
@@ -119,7 +133,7 @@ end
 function RemoteHandler:generateEmbed( guildID, userID, forPoll )
     local client, event = self.worker.client, self.worker.guilds[ guildID ].events[ userID ]
 	if forPoll then
-        print "Generating embeds for poll information is NYI"
+        return Logger.w "Generating embeds for poll information is NYI"
 	else
 		local nickname = self.worker.client:getGuild( guildID ):getMember( userID ).nickname
 		return {
