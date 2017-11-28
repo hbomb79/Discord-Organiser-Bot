@@ -6,15 +6,13 @@ local function formResponses( client, responses )
 	for userID, response in pairs( responses ) do table.insert( states[ response + 1 ], userID ) end
 
 	local function out( a ) str = str .. "\n" .. a end
-	for s = 1, #states do
+	for s = #states, 1, -1 do
 		local state = states[ s ]
 		if #state > 0 then
 			local name = Worker.ATTEND_ENUM[ s ]
 			out( ("__%s%s__"):format( name:sub( 1, 1 ):upper(), name:sub( 2 ) ) )
 
-			for r = 1, #state do
-				out( ("- %s"):format( client:getUser( state[ r ] ).fullname ) )
-			end
+			for r = 1, #state do out( "- <@" .. state[ r ] .. ">" ) end
 		end
 	end
 
@@ -145,7 +143,7 @@ function RemoteHandler:generateEmbed( guildID, userID, forPoll )
 			fields = {
 				{ name = "Location", value = event.location, inline = true },
 				{ name = "Timeframe", value = event.timeframe, inline = true },
-				{ name = "RSVPs (use the reactions underneath)", value = formResponses( client, event.responses ) }
+				{ name = "RSVPs", value = formResponses( client, event.responses ) }
 			},
 
 			author = {
