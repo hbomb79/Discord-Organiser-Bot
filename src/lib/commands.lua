@@ -88,11 +88,10 @@ commands = {
     settings = {
         help = "Used in syntax 'cmd settings settingName settingValue'. If no 'settingName', all settings for the guild (and their value) will be shown (along with more indepth help information).",
         action = function( eventManager, guildID, userID, message )
-            local args = splitArguments( select( 2, eventManager.worker.commandManager:splitCommand( guildID, message.content ) ) )
+            local property, value = select( 2, eventManager.worker.commandManager:splitCommand( guildID, message.content ) ):match "(%S+)%s+(.+)$"
             local guildConfig = eventManager.worker.guilds[ guildID ]
 
-            local settingArg = args[ 1 ]
-            if not settingArg then
+            if not property then
                 local fields = {}
                 for name, config in pairs( SettingsHandler.SETTINGS ) do
                     local currentOverride = eventManager.worker:getOverrideForDisplay( guildID, name )
@@ -104,29 +103,29 @@ commands = {
                 return Logger.s( "Served general settings information to user " .. userID .." via guild " .. guildID .. " channel " .. message.channel.id .. " ("..message.channel.name..")" )
             end
 
-            local isGetting = not ( args[ 2 ] and #args[ 2 ] > 0 )
+            local isGetting = not ( value and #value > 0 )
             local function reportVal( updated )
-                local currentOverride = eventManager.worker:getOverrideForDisplay( guildID, settingArg )
-                local isOverrideDefault = eventManager.worker:isOverrideDefault( guildID, settingArg )
+                local currentOverride = eventManager.worker:getOverrideForDisplay( guildID, property )
+                local isOverrideDefault = eventManager.worker:isOverrideDefault( guildID, property )
 
-                Reporter[ updated and "success" or "info" ]( message.channel, "Guild setting '"..settingArg.."'", "The value for this guild setting is " .. ( updated and "now " or "" ) .. tostring( currentOverride ) .. ( isOverrideDefault and "\n\n*This is the default value*" or "" ) )
+                Reporter[ updated and "success" or "info" ]( message.channel, "Guild setting '"..property.."'", "The value for this guild setting is " .. ( updated and "now " or "" ) .. tostring( currentOverride ) .. ( isOverrideDefault and "\n\n*This is the default value*" or "" ) )
             end
 
-            if SettingsHandler.SETTINGS[ settingArg ] then
+            if SettingsHandler.SETTINGS[ property ] then
                 if isGetting then
                     reportVal()
-                    return Logger.s( "Served guild setting '"..settingArg.."' for guild '"..guildID.."'" )
+                    return Logger.s( "Served guild setting '"..property.."' for guild '"..guildID.."'" )
                 else
-                    local ok, err = eventManager.worker:setOverride( guildID, settingArg, args[ 2 ] ~= "none" and args[ 2 ] or nil )
+                    local ok, err = eventManager.worker:setOverride( guildID, property, value ~= "none" and value or nil )
                     if ok then
                         reportVal( true )
-                        return Logger.s( "Updated guild setting '"..settingArg.."' to '"..args[ 2 ].."' under instruction from user '"..userID.."' at guild '"..guildID.."'" )
+                        return Logger.s( "Updated guild setting '"..property.."' to '"..value.."' under instruction from user '"..userID.."' at guild '"..guildID.."'" )
                     else
                         Reporter.failure( message.channel, "Failed to update guild override", tostring( err ) )
                     end
                 end
             else
-                Reporter.failure( message.channel, "Unknown guild setting", "The guild setting '"..settingArg.."' doesn't exist, ensure you haven't made a typing mistake. Check 'cmd settings' for a list of valid settings" )
+                Reporter.failure( message.channel, "Unknown guild setting", "The guild setting '"..property.."' doesn't exist, ensure you haven't made a typing mistake. Check 'cmd settings' for a list of valid settings" )
             end
         end
     },
