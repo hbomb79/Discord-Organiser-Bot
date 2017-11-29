@@ -8,10 +8,13 @@ local function report( code, ... )
     return false, reason, code
 end
 
-local function notifyMembers( worker, guildID, userID, event, title, desc )
+local function notifyMembers( worker, guildID, _userID, event, title, desc, allStates )
     for userID, responseState in pairs( event.responses ) do
-        if responseState == 1 or responseState == 2 then
-            Reporter.info( worker.client:getUser( userID ):getPrivateChannel(), title, desc )
+        if allStates or responseState == 1 or responseState == 2 then
+            coroutine.wrap( function()
+                -- Use of a closure here is to wrap the :getUser call AS WELL AS the reporter call.
+                Reporter.info( worker.client:getUser( userID ):getPrivateChannel(), title, desc )
+            end )()
         end
     end
 end
@@ -239,7 +242,7 @@ function EventManager:unpublishEvent( guildID, userID, noNotify )
     event.published = nil
 
     if not noNotify then
-        notifyMembers( self.worker, guildID, userID, event, "Event Cancelled", "The event **" .. ( event.title or "no title" ) .. "** by user " .. event.author.id .. " at guild " .. guildID .. " has been cancelled." )
+        notifyMembers( self.worker, guildID, userID, event, "Event Cancelled", "The event **" .. ( event.title or "no title" ) .. "** by user " .. userID .. " at guild " .. guildID .. " has been cancelled." )
     end
 
     self:saveEvents()
@@ -251,13 +254,19 @@ end
     @instance
     @desc Sets the property to the value given on the event provided.
 
+          If not 'noNotify' then, users that RSVPd as 'going',
+          'might be going' or 'not going' will be notified of this
+          change. This is to ensure that the property change hasn't
+          meant that users previously able to attend are now unable
+          (or vice-versa: members not able to attend can now do so).
+
           * Will fail for the following reasons -- user 'errorCode' to determine reason:
             1: user doesn't own an event at this guild
             2: property name is invalid
     @param <string - guildID>, <string - userID>, <string - property>, <Any - value>
     @return <boolean - success>, <string - output>, [number - errorCode]
 ]]
-function EventManager:setEventProperty( guildID, userID, property, value )
+function EventManager:setEventProperty( guildID, userID, property, value, noNotify )
     local event = self:getEvent( guildID, userID )
     if not event then
         return report( 1, REFUSE_ERROR:format( "set event property", guildID, userID, "the user doesn't an event at this guild" ) )
@@ -268,6 +277,10 @@ function EventManager:setEventProperty( guildID, userID, property, value )
     event[ property ] = value ~= "none" and value or nil
     self:saveEvents( event )
     coroutine.wrap( self.repairUserEvent )( self, guildID, userID )
+
+    if not noNotify then
+        notifyMembers( self.worker, guildID, userID, event, "Event Details Have Changed", "The event **" .. ( event.title or "no title" ) .. "** authored by user " .. userID .. " at guild " .. guildID .. " has been changed.\n\nPlease review the event in the guild to make sure you don't need to change your RSVP state", true )
+    end
 
     return Logger.s( SUCCESS:format( "Set event property '"..property.."' to '"..value.."'", guildID, userID ) )
 end

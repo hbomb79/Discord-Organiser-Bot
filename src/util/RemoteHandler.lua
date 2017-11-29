@@ -166,9 +166,14 @@ end
 
           If 'force' the channel will be cleared and the details for
           each published event will be pushed.
-    @param <string - guildID>, <string - userID>, [boolean - force]
+
+          If 'noSave' the guilds won't be saved after this function
+          completes. This is to prevent mass-saving when all guilds
+          are repaired. Should be left as 'nil', or set to 'false' when
+          only repairing one event.
+    @param <string - guildID>, <string - userID>, [boolean - force], [boolean - noSave]
 ]]
-function RemoteHandler:repairUserEvent( guildID, userID, force )
+function RemoteHandler:repairUserEvent( guildID, userID, force, noSave )
     if force then
         Logger.i( "Attempting to FORCIBLY repair user event at guild " .. guildID .. " for user " .. userID, "Revoking messages from target channel before proceeding" )
         self:revokeFromRemote( guildID, userID )
@@ -206,7 +211,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
 
     -- Repair the reactions attached to both event and poll messages (if present).
     coroutine.wrap( self.repairReactions )( self, guildID, userID, event, channel )
-    self.worker:saveGuilds()
+    if not noSave then self.worker:saveGuilds() end
 
     return true
 end
@@ -227,8 +232,10 @@ end
 function RemoteHandler:repairGuild( guildID, force )
     local events = self:getPublishedEvents( guildID )
     for e = 1, #events do
-        self:repairUserEvent( guildID, events[ e ].author, force )
+        self:repairUserEvent( guildID, events[ e ].author, force, true )
     end
+
+    self.worker:saveGuilds()
 end
 
 --[[
@@ -245,6 +252,7 @@ end
     @param [boolean - force]
 ]]
 function RemoteHandler:repairAllGuilds( force )
+    Logger.i( "Repairing all guilds", "Force: " .. tostring( force ) )
     for guildID in pairs( self.worker.guilds ) do
         coroutine.wrap( self.repairGuild )( self, guildID, force ) -- Each guild has it's own coroutine to repair itself in. Event's inside the same guild will run synchronously
     end
