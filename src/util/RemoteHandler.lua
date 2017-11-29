@@ -169,8 +169,6 @@ end
     @param <string - guildID>, <string - userID>, [boolean - force]
 ]]
 function RemoteHandler:repairUserEvent( guildID, userID, force )
-    local hash = guildID .. ":" .. userID
-
     if force then
         Logger.i( "Attempting to FORCIBLY repair user event at guild " .. guildID .. " for user " .. userID, "Revoking messages from target channel before proceeding" )
         self:revokeFromRemote( guildID, userID )
@@ -180,7 +178,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
     local event, channel = verifyAndFetchChannel( self, guildID, userID )
     if not ( event and event.published ) then return end
     if not ( event.snowflake and channel:getMessage( event.snowflake ) ) then
-        local eventMessage = channel:send { embed = self:generateEmbed( guildID, userID ) }
+        local eventMessage = channel:send { content = self.worker:getOverride( guildID, "leadingMessage" ) or "", embed = self:generateEmbed( guildID, userID ) }
         if not eventMessage then
             return Logger.e( "Failed to push event message for user "..userID.." event to guild " .. guildID )
         end
@@ -188,7 +186,9 @@ function RemoteHandler:repairUserEvent( guildID, userID, force )
         event.snowflake, event.updated = eventMessage.id, false
         Logger.w( "Event snowflake missing (or message missing from remote), pushing event message to remote" )
     elseif event.updated then
-        channel:getMessage( event.snowflake ):setEmbed( self:generateEmbed( guildID, userID ) )
+        local message = channel:getMessage( event.snowflake )
+        message:setEmbed( self:generateEmbed( guildID, userID ) )
+        message:setContent( self.worker:getOverride( guildID, "leadingMessage" ) or "" )
         event.updated = false
 
         Logger.i( "Event snowflake valid, but event has changed — editing message" )

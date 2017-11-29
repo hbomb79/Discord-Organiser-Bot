@@ -53,6 +53,9 @@ end
         show: A function called when the property is requested for display purposes (via self:getOverrideForDisplay). Allows
               markdown/Discord formatting (such as for channel names, etc).
         useFallback: If true, the value of the property with an underscore prefixed (eg: prefix -> _prefix) will be used if a normal value cannot be found
+        get: If set as a function, this function is called when getting the override.
+        preSet: If set as a function, it is called just before setting the override value. Has no bearing on the value being set
+        postSet: If set as a function, it is called just after setting the override value. Like preSet, this function has no control over the value being set
 ]]
 
 SettingsHandler = class "SettingsHandler" {
@@ -81,6 +84,12 @@ SettingsHandler = class "SettingsHandler" {
                     if not channel then return end
 
                     self.eventManager:repairGuild( guildID )
+                end
+            },
+            leadingMessage = {
+                help = "The content of the message that leads the embed. This is usually used to tag people, or provide generic information. Not controllable on a per-event basis",
+                postSet = function( self, guildID )
+                    self.eventManager:repairGuild( guildID, true )
                 end
             }
         };
