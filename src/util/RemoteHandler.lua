@@ -10,7 +10,7 @@ local function formResponses( client, responses )
 		local state = states[ s ]
 		if #state > 0 then
 			local name = Worker.ATTEND_ENUM[ s ]
-			out( ("__%s%s__"):format( name:sub( 1, 1 ):upper(), name:sub( 2 ) ) )
+			out( ("__%s%s__ (%s)"):format( name:sub( 1, 1 ):upper(), name:sub( 2 ), #state ) )
 
 			for r = 1, #state do out( "- <@" .. state[ r ] .. ">" ) end
 		end
