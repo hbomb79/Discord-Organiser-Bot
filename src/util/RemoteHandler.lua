@@ -171,6 +171,12 @@ end
 function RemoteHandler:repairUserEvent( guildID, userID, force )
     local hash = guildID .. ":" .. userID
 
+    if force then
+        Logger.i( "Attempting to FORCIBLY repair user event at guild " .. guildID .. " for user " .. userID, "Revoking messages from target channel before proceeding" )
+        self:revokeFromRemote( guildID, userID )
+        Logger.s( "Messages from remote revoked. Proceeding with repair (messages will be missing, causing recreation)" )
+    end
+
     local event, channel = verifyAndFetchChannel( self, guildID, userID )
     if not ( event and event.published ) then return end
     if not ( event.snowflake and channel:getMessage( event.snowflake ) ) then
@@ -208,6 +214,14 @@ end
 --[[
     @instance
     @desc Fixes all events published to the guild
+
+          If 'force', all messages will first be deleted and then
+          recreated. In this sense, the messages are not being
+          repaired, but replaced.
+
+          Using 'force' should be avoided as it is rather
+          intensive. Only use force if a normal repair
+          didn't resolve the issue.
     @param <string - guildID>, [boolean - force]
 ]]
 function RemoteHandler:repairGuild( guildID, force )
@@ -220,6 +234,14 @@ end
 --[[
     @instance
     @desc Repairs all events published to all registered guilds
+
+          If 'force', all messages will first be deleted and then
+          recreated. In this sense, the messages are not being
+          repaired, but replaced.
+
+          Using 'force' should be avoided as it is rather
+          intensive. Only use force if a normal repair
+          didn't resolve the issue.
     @param [boolean - force]
 ]]
 function RemoteHandler:repairAllGuilds( force )
