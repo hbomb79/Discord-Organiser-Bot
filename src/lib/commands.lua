@@ -139,10 +139,18 @@ commands = {
     },
 
     delete = {
-        help = "Deletes the user's event at this guild (if one exists). This action is non-reversible and will erase all event details (including RSVPs -- members that have responded will be notified that the event has been cancelled)",
+        help = "Deletes the user's event at this guild (if one exists). This action is irreversible and will erase all event details. Members that have RSVPd as **going** or **might be going** will be notified that the event has been cancelled. If your event has not been cancelled, but has instead finished, use 'cmd conclude'.",
         action = "deleteEvent",
         onFailure = function( eventManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to delete event", reason )
+        end
+    },
+
+    conclude = {
+        help = "Use this command to mark the event as completed. This removes the event entirely (same as 'cmd delete'), this action is irreversible. Members that have RSVPd as **going** or **might be going** will be notified that the event is finished",
+        action = "concludeEvent",
+        onFailure = function( eventManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to conclude event", reason )
         end
     },
 
@@ -155,7 +163,7 @@ commands = {
     },
 
     unpublish = {
-        help = "Unpublishes your event from the guild. Members who have RSVPed will be notified that the event is cancelled (and all responses will be erased). There is no need to unpublish your event when editing details.",
+        help = "Unpublishes your event from the guild. Members who have RSVPd as **going** or **might be going** will be notified that the event is cancelled (and all responses will be erased). There is no need to unpublish your event when editing details.",
         action = "unpublishEvent",
         onFailure = function( evManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to unpublish event", reason )

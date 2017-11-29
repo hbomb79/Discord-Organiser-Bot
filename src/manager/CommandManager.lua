@@ -146,17 +146,17 @@ function CommandManager:executeCommand( commandName, messageContext )
         -- The command executed successfully. Call 'onSuccess' if present, otherwise react to the message with a checkmark.
         if type( com.onSuccess ) == "function" then
             com.onSuccess( self.worker.eventManager, messageContext.author, messageContext, success, reason, statusCode )
-        else
-            messageContext:addReaction "✅"
         end
+
+        messageContext:addReaction "✅"
     else
         if com.responses and com.responses[ statusCode ] then
             Reporter.failure( messageContext.channel, "Failed to execute '"..commandName.."'", com.responses[ statusCode ] )
         elseif type( com.onFailure ) == "function" then
             com.onFailure( self.worker.eventManager, messageContext.author, messageContext, success, reason, statusCode )
-        else
-            messageContext:addReaction "❌"
         end
+
+        messageContext:addReaction "❌"
     end
 
     return true, success, reason, statusCode

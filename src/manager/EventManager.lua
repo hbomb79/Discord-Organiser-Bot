@@ -8,6 +8,14 @@ local function report( code, ... )
     return false, reason, code
 end
 
+local function notifyMembers( worker, guildID, userID, event, title, desc )
+    for userID, responseState in pairs( event.responses ) do
+        if responseState == 1 or responseState == 2 then
+            Reporter.info( worker.client:getUser( userID ):getPrivateChannel(), title, desc )
+        end
+    end
+end
+
 --[[
     A manager class that provides the ability for the bot
     to create, edit, remove and organise user created
@@ -126,12 +134,17 @@ end
 
           Take care when deleting events.
 
+          If not 'noNotify', users that RSVPd as 'going' or 'maybe going'
+          to the event being deleted will be notified that the event
+          has been cancelled (NOTE: This only applies if the event has
+          been published).
+
           * Will fail for the following reasons -- use 'errorCode' to determine reason:
             1: user doesn't own an event at this guild
     @param <string - guildID>, <string - userID>
     @return <boolean - success>, <string - output>, [number - errorCode]
 ]]
-function EventManager:deleteEvent( guildID, userID )
+function EventManager:deleteEvent( guildID, userID, noNotify )
     local event = self:getEvent( guildID, userID )
     if not event then
         return report( 1, REFUSE_ERROR:format( "delete event", guildID, userID, "the user doesn't own an event at this guild" ) )
@@ -139,13 +152,40 @@ function EventManager:deleteEvent( guildID, userID )
 
     if event.published then
         Logger.i( "Attempting to delete published event -- unpublishing event first" )
-        self:unpublishEvent( guildID, userID )
+        self:unpublishEvent( guildID, userID, noNotify )
     end
 
     self.worker.guilds[ guildID ].events[ userID ] = nil
     self:saveEvents()
 
     return Logger.s( SUCCESS:format( "Deleted event", guildID, userID ) )
+end
+
+--[[
+    @instance
+    @desc Concludes the event owner by the user at the guild provided.
+          The event will be deleted and all members that RSVPd as 'going'
+          or 'maybe going' will be notified that the event has finished.
+
+          * Will fail for the following reasons -- use 'errorCode' to determine reason:
+            1: user doesn't own an event at this guild
+            2: user's event is not published
+    @param <string - guildID>, <string - userID>
+]]
+function EventManager:concludeEvent( guildID, userID )
+    local event = self:getEvent( guildID, userID )
+    if not event then
+        return report( 1, REFUSE_ERROR:format( "conclude event", guildID, userID, "the user doesn't own an event at this guild" ) )
+    elseif not event.published then
+        return report( 2, REFUSE_ERROR:format( "conclude event", guildID, userID, "the user's event is not published, and cannot be concluded" ) )
+    end
+
+    local success, output, errorCode = self:deleteEvent( guildID, userID, true )
+    if success then
+        notifyMembers( self.worker, guildID, userID, event, "Event Finished", "The event **" .. ( event.title or "no title" ) .. "** at guild " .. guildID .. " authored by user " .. userID .. " has completed." )
+    else return false, output, errorCode + 2 end
+
+    return Logger.s( SUCCESS:format( "Conluded event", guildID, userID ) )
 end
 
 --[[
@@ -177,13 +217,17 @@ end
     @instance
     @desc Unpublishes the event owned by the user at the guild provided.
 
+          If NOT 'noNotify', users that RSVPd as 'going' or 'maybe going'
+          to the event being unpublished will be notified that the event
+          has been CANCELLED.
+
           * Will fail for the following reasons -- use 'errorCode' to determine reason:
             1: user doesn't own an event at this guild
             2: user's event is not published
-    @param <string - guildID>, <string - userID>
+    @param <string - guildID>, <string - userID>, [boolean - noNotify]
     @return <boolean - success>, <string - output>, [number - errorCode]
 ]]
-function EventManager:unpublishEvent( guildID, userID )
+function EventManager:unpublishEvent( guildID, userID, noNotify )
     local event = self:getEvent( guildID, userID )
     if not event then
         return report( 1, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user doesn't own an event at this guild" ) )
@@ -193,6 +237,10 @@ function EventManager:unpublishEvent( guildID, userID )
 
     coroutine.wrap( self.revokeFromRemote )( self, guildID, userID )
     event.published = nil
+
+    if not noNotify then
+        notifyMembers( self.worker, guildID, userID, event, "Event Cancelled", "The event **" .. ( event.title or "no title" ) .. "** by user " .. event.author.id .. " at guild " .. guildID .. " has been cancelled." )
+    end
 
     self:saveEvents()
 
