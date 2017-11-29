@@ -220,8 +220,6 @@ function Worker:addToQueue( target, userID )
     elseif discordia.class.isInstance( target, discordia.class.classes.Reaction ) then
         if not userID then return Logger.w( "Cannot add Reaction to worker queue because no userID was provided (arg #2)" ) end
 
-        Logger.i "Adding reaction to queue"
-        -- target:delete( userID )
         table.insert( self.queue, { target, userID } )
     else
         return Logger.w( "Unknown target '"..tostring( target ).."' for worker queue" )
@@ -240,7 +238,6 @@ function Worker:checkQueue()
     local queue = self.queue
     if #queue == 0 or self.working then return end
 
-    Logger.i( "Starting queue in order to process items (" .. #queue .. ")" )
     self.working = true
     while #queue > 0 do
         local item = queue[ 1 ]
