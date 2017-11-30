@@ -186,19 +186,69 @@ commands = {
         end
     },
 
-    createPoll = {},
+    createPoll = {
+        help = "",
+        action = "createPoll",
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to create poll", reason )
+        end
+    },
 
-    setPollDesc = {},
+    setPollDesc = {
+        help = "",
+        action = function( evManager, guildID, userID, message )
+            local trailing = select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) )
+            if not ( trailing and #trailing > 0 ) then
+                return report( 1, "Invalid syntax given to setPollDesc command. Should be form 'cmd setPollDesc <desc>'" )
+            end
 
-    addPollOption = {},
+            local ok, output, code = evManager:setPollDescription( guildID, userID, trailing )
+            if ok then return ok, output else return ok, output, 1 + ( code or 1 ) end
+        end,
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to set poll description", reason )
+        end
+    },
 
-    listPollOptions = {},
+    addPollOption = {
+        help = "",
+        action = function( evManager, guildID, userID, message )
+            local trailing = select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) )
+            if not ( trailing and #trailing > 0 ) then
+                return report( 1, "Invalid syntax given to addPollOption command. Should be form 'cmd addPollOption <option>'" )
+            end
 
-    removePollOption = {},
+            local ok, output, code = evManager:addPollOption( guildID, userID, trailing )
+            if ok then return ok, output else return ok, output, 1 + ( code or 1 ) end
+        end,
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to add poll option", reason )
+        end
+    },
 
-    deletePoll = {},
+    removePollOption = {
+        help = "",
+        action = function( evManager, guildID, userID, message )
+            local trailing = select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) )
+            if not ( trailing and #trailing > 0 ) then
+                return report( 1, "Invalid syntax given to removePollOption command. Should be form 'cmd removePollOption <index>' where 'index' is a number representing a valid poll option" )
+            end
 
-    view = {},
+            local ok, output, code = evManager:removePollOption( guildID, userID, trailing )
+            if ok then return ok, output else return ok, output, 1 + ( code or 1 ) end
+        end,
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to remove poll option", reason )
+        end
+    },
+
+    deletePoll = {
+        help = "",
+        action = "deletePoll",
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to delete poll", reason )
+        end
+    },
 
     revokeRemote = {
         help = "\\*Admin Command* Syntax: 'cmd revokeRemote @tagUser'\n\nForcibly unpublishes the event by the tagged user (alternatively, the userID can be plainly provided instead of tagging the user).",

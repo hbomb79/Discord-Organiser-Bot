@@ -1,13 +1,8 @@
-local Reporter, Logger, Manager, RemoteHandler = require "src.util.Reporter", require "src.util.Logger", require "src.manager.Manager", require "src.util.RemoteHandler"
+local Reporter, Logger, Manager, RemoteHandler, PollHandler = require "src.util.Reporter", require "src.util.Logger", require "src.manager.Manager", require "src.util.RemoteHandler", require "src.util.PollHandler"
 
 local VALID_SETTINGS = { title = true, desc = true, location = true, timeframe = true }
 
 local REFUSE_ERROR, SUCCESS = "Refusing to %s at guild %s for user %s because %s", "%s at guild %s for user %s"
-local function report( code, ... )
-    local _, reason = Logger.w( ... )
-    return false, reason, code
-end
-
 local function notifyMembers( worker, guildID, _userID, event, title, desc, allStates )
     for userID, responseState in pairs( event.responses ) do
         if allStates or responseState == 1 or responseState == 2 then
@@ -36,6 +31,12 @@ end
 ]]
 
 local EventManager = class "EventManager" {}
+
+
+function EventManager:report( code, ... )
+    local _, reason = Logger.w( ... )
+    return false, reason, code
+end
 
 --[[
     @instance
@@ -106,7 +107,7 @@ end
 ]]
 function EventManager:createEvent( guildID, userID )
     if self:getEvent( guildID, userID ) then
-        return report( 1, REFUSE_ERROR:format( "create event", guildID, userID, "the user already has an event at this guild" ) )
+        return self:report( 1, REFUSE_ERROR:format( "create event", guildID, userID, "the user already has an event at this guild" ) )
     end
 
     self.worker.guilds[ guildID ].events[ userID ] = {
@@ -150,7 +151,7 @@ end
 function EventManager:deleteEvent( guildID, userID, noNotify )
     local event = self:getEvent( guildID, userID )
     if not event then
-        return report( 1, REFUSE_ERROR:format( "delete event", guildID, userID, "the user doesn't own an event at this guild" ) )
+        return self:report( 1, REFUSE_ERROR:format( "delete event", guildID, userID, "the user doesn't own an event at this guild" ) )
     end
 
     if event.published then
@@ -178,9 +179,9 @@ end
 function EventManager:concludeEvent( guildID, userID )
     local event = self:getEvent( guildID, userID )
     if not event then
-        return report( 1, REFUSE_ERROR:format( "conclude event", guildID, userID, "the user doesn't own an event at this guild" ) )
+        return self:report( 1, REFUSE_ERROR:format( "conclude event", guildID, userID, "the user doesn't own an event at this guild" ) )
     elseif not event.published then
-        return report( 2, REFUSE_ERROR:format( "conclude event", guildID, userID, "the user's event is not published, and cannot be concluded" ) )
+        return self:report( 2, REFUSE_ERROR:format( "conclude event", guildID, userID, "the user's event is not published, and cannot be concluded" ) )
     end
 
     local success, output, errorCode = self:deleteEvent( guildID, userID, true )
@@ -204,9 +205,9 @@ end
 function EventManager:publishEvent( guildID, userID )
     local event = self:getEvent( guildID, userID )
     if not event then
-        return report( 1, REFUSE_ERROR:format( "publish event", guildID, userID, "the user doesn't own an event at this guild" ) )
+        return self:report( 1, REFUSE_ERROR:format( "publish event", guildID, userID, "the user doesn't own an event at this guild" ) )
     elseif event.published then
-        return report( 2, REFUSE_ERROR:format( "publish event", guildID, userID, "the user's event is already published" ) )
+        return self:report( 2, REFUSE_ERROR:format( "publish event", guildID, userID, "the user's event is already published" ) )
     end
 
     event.published = true
@@ -233,9 +234,9 @@ end
 function EventManager:unpublishEvent( guildID, userID, noNotify )
     local event = self:getEvent( guildID, userID )
     if not event then
-        return report( 1, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user doesn't own an event at this guild" ) )
+        return self:report( 1, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user doesn't own an event at this guild" ) )
     elseif not event.published then
-        return report( 2, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user's event is not published" ) )
+        return self:report( 2, REFUSE_ERROR:format( "unpublish event", guildID, userID, "the user's event is not published" ) )
     end
 
     coroutine.wrap( self.revokeFromRemote )( self, guildID, userID )
@@ -269,10 +270,12 @@ end
 function EventManager:setEventProperty( guildID, userID, property, value, noNotify )
     local event = self:getEvent( guildID, userID )
     if not event then
-        return report( 1, REFUSE_ERROR:format( "set event property", guildID, userID, "the user doesn't an event at this guild" ) )
+        return self:report( 1, REFUSE_ERROR:format( "set event property", guildID, userID, "the user doesn't an event at this guild" ) )
     elseif not VALID_SETTINGS[ property ] then
-        return report( 2, REFUSE_ERROR:format( "set event property", guildID, userID, "the setting provided '"..tostring( property ).."' is invalid. Valid settings: title, desc, location, timeframe." ) )
+        return self:report( 2, REFUSE_ERROR:format( "set event property", guildID, userID, "the setting provided '"..tostring( property ).."' is invalid. Valid settings: title, desc, location, timeframe." ) )
     end
+
+    if property == "title" and event.poll then event.poll.updated = true end
 
     event[ property ] = value ~= "none" and value or nil
     self:saveEvents( event )
@@ -304,13 +307,13 @@ end
 function EventManager:respondToEvent( guildID, userID, respondingUserID, respondingUserState, noUpdate )
     local event = self:getEvent( guildID, userID )
     if not event then
-        return report( 1, REFUSE_ERROR:format( "respond to event", guildID, userID, "the user doesn't have an event at this guild" ) )
+        return self:report( 1, REFUSE_ERROR:format( "respond to event", guildID, userID, "the user doesn't have an event at this guild" ) )
     elseif not event.published then
-        return report( 2, REFUSE_ERROR:format( "respond to event", guildID, userID, "the users event is not published" ) )
+        return self:report( 2, REFUSE_ERROR:format( "respond to event", guildID, userID, "the users event is not published" ) )
     elseif not ( type( respondingUserState ) == "number" and respondingUserState >= 0 and respondingUserState <= 2 ) then
-        return report( 3, REFUSE_ERROR:format( "respond to event", guildID, userID, "the responding state is invalid. Can only be 0 (not attending), 1 (maybe attending), or 2 (is attending). Received: " .. tostring( respondingUserState ) ) )
+        return self:report( 3, REFUSE_ERROR:format( "respond to event", guildID, userID, "the responding state is invalid. Can only be 0 (not attending), 1 (maybe attending), or 2 (is attending). Received: " .. tostring( respondingUserState ) ) )
     elseif event.responses[ respondingUserID ] == respondingUserState then
-        return report( 4, REFUSE_ERROR:format( "respond to event", guildID, userID, "the responding user has already responded using the same responding state ("..respondingUserState..")" ) )
+        return self:report( 4, REFUSE_ERROR:format( "respond to event", guildID, userID, "the responding user has already responded using the same responding state ("..respondingUserState..")" ) )
     end
 
     event.responses[ respondingUserID ] = respondingUserState
@@ -320,5 +323,5 @@ function EventManager:respondToEvent( guildID, userID, respondingUserID, respond
     return Logger.s( SUCCESS:format( "Responded to event (for user '"..respondingUserID.."' as state '"..respondingUserState.."')", guildID, userID ) )
 end
 
-extends "Manager" mixin "RemoteHandler"
+extends "Manager" mixin "RemoteHandler" mixin "PollHandler"
 return EventManager:compile()

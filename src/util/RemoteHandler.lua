@@ -43,6 +43,7 @@ end
 local RemoteHandler = class "RemoteHandler" {
     static = {
         ATTEND_REACTIONS = { "✅", "❔", "🚫" };
+        POLL_REACTIONS = { "1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣", "🔟" };
     };
 
     repairing = {};
@@ -115,6 +116,38 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
         coroutine.wrap( evManager.repairUserEvent )( self, guildID, userID )
         Logger.s( "Resolved " .. count .. " offline RSVPs for event at guild " .. guildID .. " for user " .. userID .. " -- repairing event" )
     end
+
+    if not event.poll then return end
+    local pollMessage = channel:getMessage( event.poll.snowflake )
+
+    -- Repair poll options.
+    local maxNeeded, accumulatedPollReactions = #event.poll.options, {}
+    for i = 1, #RemoteHandler.POLL_REACTIONS do
+        local reaction = pollMessage.reactions:get( RemoteHandler.POLL_REACTIONS[ i ] )
+        if i > maxNeeded then
+            if reaction then
+                local users = reaction:getUsers()
+                if not users then return Logger.w( "Failed to fetch users for reaction. Assuming message or reaction has been removed. Bailing out" ) end
+
+                for user in users:iter() do reaction:delete( user.id ) end
+            end
+        else
+            if not reaction then
+                if not pollMessage:addReaction( RemoteHandler.POLL_REACTIONS[ i ] ) then
+                    return Logger.w "Reaction failed to add to poll message. Assuming message has been deleted. Bailing out"
+                end
+            elseif reaction.count > 1 then
+                local users = reaction:getUsers()
+                if not users then return Logger.w( "Failed to fetch users for reaction. Assuming message or reaction has been removed. Bailing out" ) end
+
+                for user in users:iter() do
+                    if user.id ~= self.worker.client.user.id then
+                        reaction:delete( user.id )
+                    end
+                end
+            end
+        end
+    end
 end
 
 --[[
@@ -134,7 +167,30 @@ end
 function RemoteHandler:generateEmbed( guildID, userID, forPoll )
     local client, event = self.worker.client, self.worker.guilds[ guildID ].events[ userID ]
 	if forPoll then
-        return Logger.w "Generating embeds for poll information is NYI"
+        local poll = event.poll
+        -- Count all votes for the options
+        local voteCount, fields = {}, {}
+        for ID, response in pairs( poll.responses ) do voteCount[ response ] = voteCount[ response ] and voteCount[ response ] + 1 or 1 end
+
+        local options = poll.options
+        for i = 1, #options do
+            local votes = voteCount[ i ] or 0
+
+            table.insert( fields, {
+                name = ( "%i) %s" ):format( i, options[ i ] ),
+                value = "*" .. votes .. " vote" .. ( votes == 1 and "" or "s" ) .. "*"
+            } )
+        end
+
+        if #fields == 0 then table.insert( fields, { name = "No Options", value = "There are no options for this poll yet." } ) end
+
+        return {
+            title = event.title .. " - Poll",
+            description = poll.desc,
+            fields = fields,
+
+            color = discordia.Color.fromRGB( 114, 137, 218 ).value
+        }
 	else
 		local nickname = self.worker.client:getGuild( guildID ):getMember( userID ).nickname
 		return {
@@ -183,13 +239,14 @@ function RemoteHandler:repairUserEvent( guildID, userID, force, noSave )
     local event, channel = verifyAndFetchChannel( self, guildID, userID )
     if not ( event and event.published ) then return end
     if not ( event.snowflake and channel:getMessage( event.snowflake ) ) then
+        Logger.w( "Event snowflake invalid, pushing event message to remote" )
+
         local eventMessage = channel:send { content = self.worker:getOverride( guildID, "leadingMessage" ) or "", embed = self:generateEmbed( guildID, userID ) }
         if not eventMessage then
-            return Logger.e( "Failed to push event message for user "..userID.." event to guild " .. guildID )
+            return Logger.e( "Failed to push event message for user "..userID.." to guild " .. guildID )
         end
 
         event.snowflake, event.updated = eventMessage.id, false
-        Logger.w( "Event snowflake missing (or message missing from remote), pushing event message to remote" )
     elseif event.updated then
         local message = channel:getMessage( event.snowflake )
         message:setEmbed( self:generateEmbed( guildID, userID ) )
@@ -201,8 +258,14 @@ function RemoteHandler:repairUserEvent( guildID, userID, force, noSave )
 
     if event.poll then
         if not ( event.poll.snowflake and channel:getMessage( event.poll.snowflake ) ) then
-            Logger.w( "Poll snowflake missing (or message missing from remote), pushing event message to remote" )
-            self:pushPollToRemote( guildID, userID, true )
+            Logger.w( "Poll snowflake invalid, pushing event message to remote" )
+
+            local pollMessage = channel:send { embed = self:generateEmbed( guildID, userID, true ) }
+            if not pollMessage then
+                return Logger.e( "Failed to push poll message for user " .. userID .. " to guild " .. guildID )
+            end
+
+            event.poll.snowflake, event.poll.updated = pollMessage.id, false
         elseif event.poll.updated then
             Logger.i( "Poll snowflake valid, but event has changed — editing message" )
             channel:getMessage( event.poll.snowflake ):setEmbed( self:generateEmbed( guildID, userID, true ) )

@@ -1,4 +1,4 @@
-local Logger, Manager, Reporter = require "src.util.Logger", require "src.manager.Manager", require "src.util.Reporter"
+local Logger, Manager, Reporter, RemoteHandler = require "src.util.Logger", require "src.manager.Manager", require "src.util.Reporter", require "src.util.RemoteHandler"
 local discordia = luvitRequire "discordia"
 
 --[[
@@ -86,7 +86,12 @@ function CommandManager:handleReaction( reaction, userID )
 
             self.worker.eventManager:respondToEvent( guildID, event.author, userID, code )
         elseif event.poll and event.poll.snowflake == messageSnowflake then
-            --TODO Poll vote
+            reaction:delete( userID )
+
+            local reactions = RemoteHandler.POLL_REACTIONS
+            for i = 1, #reactions do
+                if reactions[ i ] == reaction.emojiName then self.worker.eventManager:submitPollVote( guildID, event.author, userID, i ) end
+            end
         end
     end
 end
