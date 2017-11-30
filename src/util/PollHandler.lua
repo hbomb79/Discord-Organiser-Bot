@@ -5,6 +5,23 @@ local PollHandler = class "PollHandler" {}
 
 --[[
     @instance
+    @desc
+]]
+function PollHandler:assignPollIDs( guildID, noSave )
+    local guildEvents, ID = self.worker.guilds[ guildID ].events, 1
+    for userID, event in pairs( guildEvents ) do
+        if event.poll and event.published then
+            if event.poll.id ~= ID then event.poll.updated = true end
+
+            event.poll.id, ID = ID, ID + 1
+        end
+    end
+
+    if not noSave then self:saveEvents() end
+end
+
+--[[
+    @instance
     @desc Creates a poll structure on the event at the
           guild provided by the user provided.
 

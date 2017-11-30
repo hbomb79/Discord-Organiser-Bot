@@ -82,7 +82,7 @@ end
     @param <string - guildID>, <string - userID>, <table - event>, <Discordia Channel Instance - channel>
 ]]
 function RemoteHandler:repairReactions( guildID, userID, event, channel )
-    local eventMessage = channel:getMessage( event.snowflake )
+    local eventMessage, repair = channel:getMessage( event.snowflake )
     if not eventMessage then return Logger.e( "Cannot repair reactions on event message because the message doesn't exist at the snowflake on record" ) end
 
     local accumulatedReactions = {}
@@ -113,8 +113,9 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
             count = count + 1
         end
 
-        coroutine.wrap( evManager.repairUserEvent )( self, guildID, userID )
         Logger.s( "Resolved " .. count .. " offline RSVPs for event at guild " .. guildID .. " for user " .. userID .. " -- repairing event" )
+
+        if not event.poll then coroutine.wrap( self.worker.eventManager.repairUserEvent )( self, guildID, userID ) else repair = true end
     end
 
     if not event.poll then return end
@@ -122,8 +123,9 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
 
     -- Repair poll options.
     local maxNeeded, accumulatedPollReactions = #event.poll.options, {}
-    for i = 1, #RemoteHandler.POLL_REACTIONS do
-        local reaction = pollMessage.reactions:get( RemoteHandler.POLL_REACTIONS[ i ] )
+    local reactions = RemoteHandler.POLL_REACTIONS
+    for i = 1, #reactions do
+        local reaction = pollMessage.reactions:get( reactions[ i ] )
         if i > maxNeeded then
             if reaction then
                 local users = reaction:getUsers()
@@ -133,7 +135,7 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
             end
         else
             if not reaction then
-                if not pollMessage:addReaction( RemoteHandler.POLL_REACTIONS[ i ] ) then
+                if not pollMessage:addReaction( reactions[ i ] ) then
                     return Logger.w "Reaction failed to add to poll message. Assuming message has been deleted. Bailing out"
                 end
             elseif reaction.count > 1 then
@@ -143,10 +145,29 @@ function RemoteHandler:repairReactions( guildID, userID, event, channel )
                 for user in users:iter() do
                     if user.id ~= self.worker.client.user.id then
                         reaction:delete( user.id )
+
+                        for i = 1, #reactions do
+                            if reactions[ i ] == reaction.emojiName then accumulatedPollReactions[ user.id ] = i end
+                        end
                     end
                 end
             end
         end
+    end
+
+    if next( accumulatedPollReactions ) then
+        local count, evManager = 0, self.worker.eventManager
+        for userID, code in pairs( accumulatedPollReactions ) do
+            evManager:submitPollVote( guildID, event.author, userID, code )
+            Reporter.info( self.worker.client:getUser( userID ):getPrivateChannel(), "Poll Vote Submitted", "You voted on a poll while this bot was offline (event **"..event.title.."**, authored by user "..event.author.." in guild "..guildID..").\n\nYour vote was found on bot startup and has been submitted." )
+            count = count + 1
+        end
+
+        Logger.s( "Resolved " .. count .. " offline votes for event at guild " .. guildID .. " for user " .. userID .. " -- repairing event" )
+
+        coroutine.wrap( self.worker.eventManager.repairUserEvent )( self, guildID, userID )
+    elseif repair then
+        coroutine.wrap( self.worker.eventManager.repairUserEvent )( self, guildID, userID )
     end
 end
 
@@ -189,7 +210,8 @@ function RemoteHandler:generateEmbed( guildID, userID, forPoll )
             description = poll.desc,
             fields = fields,
 
-            color = discordia.Color.fromRGB( 114, 137, 218 ).value
+            color = discordia.Color.fromRGB( 114, 137, 218 ).value,
+            footer = { text = poll.id and ( "This poll's ID is " .. poll.id ) or "This poll has no ID. Consider running !repairGuild"  }
         }
 	else
 		local nickname = self.worker.client:getGuild( guildID ):getMember( userID ).nickname
@@ -269,6 +291,7 @@ function RemoteHandler:repairUserEvent( guildID, userID, force, noSave )
         elseif event.poll.updated then
             Logger.i( "Poll snowflake valid, but event has changed — editing message" )
             channel:getMessage( event.poll.snowflake ):setEmbed( self:generateEmbed( guildID, userID, true ) )
+            event.poll.updated = false
         end
     end
 
@@ -294,6 +317,8 @@ end
 ]]
 function RemoteHandler:repairGuild( guildID, force )
     local events = self:getPublishedEvents( guildID )
+    self:assignPollIDs( guildID, true )
+
     for e = 1, #events do
         self:repairUserEvent( guildID, events[ e ].author, force, true )
     end

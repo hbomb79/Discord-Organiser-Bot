@@ -250,6 +250,53 @@ commands = {
         end
     },
 
+    listPollVotes = {
+        help = "Lists the votes for the poll provided, including the names of those who have voted. Used in syntax 'cmd listPollVotes <pollID>' where 'pollID' is the numeric ID found at the bottom of a poll message.",
+        action = function( evManager, guildID, userID, message )
+            local ID = tonumber( select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) ) )
+            if not ID then
+                return report( 1, "Invalid syntax given to listPollVotes command. Should be form 'cmd listPollVotes <pollID>' where 'pollID' is a VALID poll ID (found at the bottom of a poll message)" )
+            end
+
+            local events = evManager.worker.guilds[ guildID ].events
+            for eventAuthorID, event in pairs( events ) do
+                if event.published and event.poll and event.poll.id == ID then
+                    -- List poll information
+                    local poll, votes, fields = event.poll, {}, {}
+                    for ID, response in pairs( poll.responses ) do
+                        if not votes[ response ] then votes[ response ] = {} end
+                        table.insert( votes[ response ], ID )
+                    end
+
+                    local options = poll.options
+                    for i = 1, #options do
+                        local v, suffix = votes[ i ], ""
+                        if v then
+                            for vs = 1, #v do
+                                suffix = suffix .. "<@" .. v[ vs ] .. ">" .. ( #v - vs > 1 and ", " or ( #v - vs == 1 and ", and " ) or "" )
+                            end
+                        end
+
+                        local len = v and #v or 0
+                        table.insert( fields, {
+                            name = i .. ") " .. options[ i ],
+                            value = #suffix > 0 and ( len .. " vote" .. ( len ~= 1 and "s" or "" ) .. ": " .. suffix ) or "No votes"
+                        } )
+                    end
+
+                    Reporter.info( message.channel, "Poll Information", "Below is the poll information for **" .. event.title .. "**", unpack( fields ) )
+
+                    return Logger.s( "Listed poll votes at guild " .. guildID .. " for user " .. userID )
+                end
+            end
+
+            return report( 2, "Invalid ID (" .. tostring( ID ) .. ") provided. No poll found with that ID." )
+        end,
+        onFailure = function( evManager, user, message, status, reason, statusCode )
+            Reporter.failure( message.channel, "Failed to list poll votes", reason )
+        end
+    },
+
     revokeRemote = {
         help = "\\*Admin Command* Syntax: 'cmd revokeRemote @tagUser'\n\nForcibly unpublishes the event by the tagged user (alternatively, the userID can be plainly provided instead of tagging the user).",
         action = function( evManager, guildID, _userID, message, args )
