@@ -1,4 +1,4 @@
-local Logger, Manager, Reporter, RemoteHandler = require "src.util.Logger", require "src.manager.Manager", require "src.util.Reporter", require "src.util.RemoteHandler"
+local Logger, Manager, Reporter, RemoteHandler = require "src.util.Logger", require "src.manager.Manager", require "src.util.Reporter"
 local discordia = luvitRequire "discordia"
 
 --[[
@@ -168,4 +168,7 @@ function CommandManager:executeCommand( commandName, messageContext )
 end
 
 extends "Manager"
-return CommandManager:compile()
+local _klass = CommandManager:compile()
+RemoteHandler = require "src.util.RemoteHandler"
+
+return _klass
