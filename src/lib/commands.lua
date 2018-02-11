@@ -298,21 +298,29 @@ commands = {
     },
 
     revokeRemote = {
-        help = "\\*Admin Command* Syntax: 'cmd revokeRemote @tagUser'\n\nForcibly unpublishes the event by the tagged user (alternatively, the userID can be plainly provided instead of tagging the user).",
+        help = "\\*Admin Command* Syntax: 'cmd revokeRemote @tagUser'\n\nForcibly removes the event by the tagged user (alternatively, the userID can be plainly provided instead of tagging the user).",
         action = function( evManager, guildID, _userID, message, args )
             -- Remove any surrounding elements of the userID (@<>).
-            local userID = tostring( splitArguments( select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) ) )[ 1 ] ):gsub( "%<@(%w+)%>", "%1" )
-            if not userID then
+            local userID = splitArguments( select( 2, evManager.worker.commandManager:splitCommand( guildID, message.content ) ) )[ 1 ]
+            userID = userID and userID:gsub( "%<@%!?(%w+)%>", "%1" )
+            if not ( userID and userID ~= "nil" ) then
                 return report( 1, "Invalid command syntax. Requires userID following command start (tag user/provide userID from debug)." )
             elseif not evManager.worker.client.users:get( userID ) then
                 return report( 2, "Invalid userID provided -- unable to find user with matching ID in client's cache" )
             end
 
             local event = evManager:getEvent( guildID, userID )
-            if not ( event and event.published ) then return report( 3, "Unable to revoke event for user " .. userID .. " -- user has no event published at guild " .. guildID ) end
+            if not event then return report( 3, "Unable to revoke event for user " .. userID .. " -- user has no event published at guild " .. guildID ) end
 
-            local ok, output, code = evManager:unpublishEvent( guildID, userID )
-            if ok then return ok, output else return ok, output, 1 + ( code or 1 ) end
+
+            local ok, output, code = evManager[ event.published and "concludeEvent" or "deleteEvent" ]( evManager, guildID, userID )
+            if ok then
+                local user = evManager.worker.client.users:get( userID )
+                Reporter.warning( user:getPrivateChannel(), "Event revoked", "Your event (**" .. ( event.title and event.title ~= "" and event.title or "no title" ) .. "** at guild " .. guildID .. ") has been revoked by an administrator. This could be because the event has finished, or was deemed invalid (cancelled, unsuitable conditions, etc)." )
+                return ok, output
+            else
+                return ok, output, 1 + ( code or 1 )
+            end
         end,
         onFailure = function( evManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to revoke remote", reason )

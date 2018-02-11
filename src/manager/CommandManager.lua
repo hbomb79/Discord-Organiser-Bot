@@ -111,7 +111,12 @@ function CommandManager:handleMessage( message )
     if not ( com and com.action ) then
         return Logger.w( "Command '" .. commandName .. "' doesn't exist, unable to execute command" )
     elseif com.permissions then
-        if not message.member:getPermissions():has( unpack( com.permissions ) ) then return Logger.w( "Command '"..commandName.."' requires permissions which the user doesn't have" ) end
+        if not message.member:getPermissions():has( unpack( com.permissions ) ) then
+          message:addReaction "❌"
+          Reporter.failure( message.channel, "Permission denied", "The command you attempted to execute ("..commandName..") requires permissions you're not equipped with in this guild.\n\nPlease contact a guild administrator if you believe this is an error.")
+
+          return Logger.w( "Command '"..commandName.."' requires permissions which the executing user doesn't have! Rejecting command request" )
+        end
     end
 
     return self:executeCommand( commandName, message )
