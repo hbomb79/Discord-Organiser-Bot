@@ -147,8 +147,8 @@ commands = {
     },
 
     conclude = {
-        help = "Use this command to mark the event as completed. This removes the event entirely (same as 'cmd delete'), this action is irreversible. Members that have RSVPd as **going** or **might be going** will be notified that the event is finished",
-        action = "concludeEvent",
+        help = "Use this command to mark the event as completed. This removes the event entirely (same as 'cmd delete'), this action is irreversible. Members that have RSVPd as **going** or **might be going** will be notified that the event is finished.",
+        action = "conludeEvent",
         onFailure = function( eventManager, user, message, status, reason, statusCode )
             Reporter.failure( message.channel, "Failed to conclude event", reason )
         end
